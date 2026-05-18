@@ -1,0 +1,14 @@
+env/
+.env
+__pycache__/
+*.pyc
+*.pyo
+db.sqlite3
+*.log
+media/
+
+# VS Code
+.vscode/
+
+
+
