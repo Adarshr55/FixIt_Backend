@@ -81,6 +81,8 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "phone",
             "role",
             "is_active",
+            "is_staff",
+            "is_superuser",
             # "is_phone_verified",
             "is_profile_complete",
             "date_joined",
@@ -111,3 +113,14 @@ class ChangePasswordSerializer(serializers.Serializer):
         return attrs
 
 
+class AdminRegisterSerializer(BaseRegisterSerializer):
+    
+    ROLE = "admin"
+
+    def create(self, validated_data):
+        validated_data.pop("password2")
+        return User.objects.create_platform_admin(
+            email=validated_data["email"],
+            password=validated_data["password"],
+
+        )

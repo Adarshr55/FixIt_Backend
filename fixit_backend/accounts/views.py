@@ -2,14 +2,16 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated,AllowAny
+from rest_framework.permissions import IsAuthenticated,AllowAny,IsAdminUser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from .permissions import IsPlatformAdmin
 from .serializers import( CustomerRegisterSerializer,
                          ProviderRegisterSerializer,
                          LoginSerializer,
                          ChangePasswordSerializer,
                          UserDetailSerializer,
+                         AdminRegisterSerializer,
                          get_tokens_for_user
                          )
 # Create your views here.
@@ -45,7 +47,11 @@ class ProviderRegisterView(APIView):
             },status=status.HTTP_201_CREATED)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
     
-
+DASHBOARD_ROUTES = {
+    'customer': '/dashboard/customer',
+    'provider': '/dashboard/provider',
+    'admin':    '/dashboard/admin',
+}
 class LoginView(APIView):
     permission_classes=[AllowAny]
 
@@ -58,8 +64,10 @@ class LoginView(APIView):
                 'message':'Login successfull',
                 'user':UserDetailSerializer(user).data,
                 'tokens':tokens,
+                'dashboard_url': DASHBOARD_ROUTES[user.role], 
             },status=status.HTTP_200_OK)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
     
 class LogoutView(APIView):
     permission_classes=[IsAuthenticated]
@@ -109,7 +117,24 @@ class ChangePasswordView(APIView):
 
 
 
+class AdminCreateView(APIView):
+    """
+    Only an existing app-admin can create another admin.
+    Never expose this to the public register page.
+    """
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
 
+    def post(self, request):
+        serializer = AdminRegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user   = serializer.save()
+            tokens = get_tokens_for_user(user)
+            return Response({
+                'message': 'Admin account created successfully.',
+                'user'   : UserDetailSerializer(user).data,
+                'tokens' : tokens,
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
