@@ -55,12 +55,17 @@ class ProviderDocumentSerializer(serializers.ModelSerializer):
             "verified_at",
             "service"
         ]
-        read_only_fields = ["id", "provider", "status", "uploaded_at"]
+        read_only_fields = [
+            "id", "provider", "status", "uploaded_at",
+            "reject_reason", "verified_at" 
+        ]
 
 class CustomerProfileCreateSerializer(serializers.Serializer):
     full_name=serializers.CharField(max_length=100)
     profile_photo=serializers.URLField(required=False, allow_blank=True)
     saved_addresses = serializers.JSONField(required=False)
+
+
 
     def create(self, validated_data):
         user=self.context['request'].user
@@ -124,6 +129,29 @@ class ProviderDocumentCreateSerializer(serializers.Serializer):
     required=False,
     allow_null=True
 )
+    
+    def validate(self, attrs):
+        service  = attrs.get('service')
+        doc_type = attrs.get('doc_type')
+        user     = self.context['request'].user
+
+        if service.provider != user.provider_profile:
+            raise serializers.ValidationError(
+                {'service': 'This service does not belong to your profile.'}
+            )
+        try:
+            provider_profile = user.provider_profile
+            existing = ProviderDocument.objects.filter(
+                provider=provider_profile,
+                doc_type=doc_type
+        )
+            if existing.exists():
+                raise serializers.ValidationError(
+                {'doc_type': f'A {doc_type} document is already uploaded or under review.'}
+            )
+        except ProviderProfile.DoesNotExist:
+            pass
+        return attrs
 
     def create(self, validated_data):
         user=self.context['request'].user
