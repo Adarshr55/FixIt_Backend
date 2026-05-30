@@ -9,6 +9,7 @@ media/
 
 # VS Code
 .vscode/
-
+env/
+.env.docker
 
 
