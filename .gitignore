@@ -11,5 +11,7 @@ media/
 .vscode/
 env/
 .env.docker
+doker/
+docker-compose.yml
 
 
