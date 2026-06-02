@@ -166,14 +166,29 @@ class ProviderDocumentView(APIView):
 class ProfileStatusView(APIView):
         permission_classes = [IsAuthenticated]
         def get(self, request):
+
             user = request.user
-            return Response(
-            {
+            response = {
+                "role":                user.role,
                 "is_profile_complete": user.is_profile_complete,
-                "role": user.role,
-            },
-            status=status.HTTP_200_OK,
-        )
+            }
+
+            if user.is_provider:
+                try:
+                    profile = user.provider_profile
+                    response.update({
+                    "approval_status": profile.approval_status,
+                    "is_approved":     profile.is_approved,
+                    "is_online":       profile.is_online,
+                    })
+                except Exception:
+                    response.update({
+                    "approval_status": None,
+                    "is_approved":     False,
+                    "is_online":       False,
+                })
+
+            return Response(response, status=status.HTTP_200_OK)
         
 
 

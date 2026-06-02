@@ -7,7 +7,7 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model=CustomerProfile
         fields=[
-            'id','user','full_name','profile_photo','saved_addresses','created_at','updated_at'
+            'id','full_name','profile_photo','saved_addresses','created_at','updated_at'
         ]
         read_only_fields = ["id", "user", "created_at", "updated_at"]
 
@@ -28,6 +28,7 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
             "service_radius_km",
             "approval_status",
             "overall_rating",
+            'hourly_rate',
             "created_at",
             "updated_at",
 
@@ -97,6 +98,7 @@ class ProviderProfileCreateSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=10, decimal_places=6, required=False, allow_null=True)
     longitude = serializers.DecimalField(max_digits=10, decimal_places=6, required=False, allow_null=True)
     service_radius_km = serializers.IntegerField(required=False, min_value=1, default=10)
+    hourly_rate= serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=0)
 
     def create(self, validated_data):
         user=self.context['request'].user
@@ -111,8 +113,11 @@ class ProviderProfileCreateSerializer(serializers.Serializer):
                 "latitude": validated_data.get("latitude"),
                 "longitude": validated_data.get("longitude"),
                 "service_radius_km": validated_data.get("service_radius_km", 10),
+                "hourly_rate":       validated_data.get("hourly_rate", 0),
             }
         )
+        user.is_profile_complete=True
+        user.save(update_fields=['is_profile_complete'])
         return profile
     def update(self, instance, validated_data):
         for field, value in validated_data.items():
@@ -134,11 +139,12 @@ class ProviderDocumentCreateSerializer(serializers.Serializer):
         service  = attrs.get('service')
         doc_type = attrs.get('doc_type')
         user     = self.context['request'].user
-
-        if service.provider != user.provider_profile:
-            raise serializers.ValidationError(
-                {'service': 'This service does not belong to your profile.'}
-            )
+        
+        if service:
+            if service.provider != user.provider_profile:
+                raise serializers.ValidationError(
+                    {'service': 'This service does not belong to your profile.'}
+                )
         try:
             provider_profile = user.provider_profile
             existing = ProviderDocument.objects.filter(

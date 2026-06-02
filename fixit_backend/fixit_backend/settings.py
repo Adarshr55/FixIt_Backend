@@ -47,7 +47,10 @@ INSTALLED_APPS = [
     'corsheaders',
     'accounts',
     'profiles',
-    'services'
+    'services',
+    'bookings',
+    'admin_panel',
+    'customer'
 ]
 
 MIDDLEWARE = [

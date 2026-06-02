@@ -30,7 +30,7 @@ class ProviderService(models.Model):
         ('unverified', 'Unverified'),
         ('pending',    'Pending Review'),
         ('verified',   'Verified'),
-        ('rejected',   'Rejected'),
+        ('rejected',   'Rejected'), 
     ]
      provider=models.ForeignKey('profiles.ProviderProfile',on_delete=models.CASCADE,related_name='services')
      category=models.ForeignKey(ServiceCategory,on_delete=models.PROTECT,related_name='provider_services')

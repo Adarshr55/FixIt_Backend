@@ -5,7 +5,6 @@ from django.conf import settings
 class CustomerProfile(models.Model):
     user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='customer_profile')
     full_name=models.CharField(max_length=100)
-    # phone=models.CharField(max_length=15,blank=True)
     profile_photo=models.URLField(blank=True)
     saved_addresses=models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -27,7 +26,6 @@ class ProviderProfile(models.Model):
      ]
      user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='provider_profile')
      full_name=models.CharField(max_length=100)
-    #  phone=models.CharField(max_length=15)
      profile_photo=models.URLField(blank=True)
      bio = models.TextField(blank=True)
      experience_years=models.PositiveIntegerField(default=0)
@@ -37,7 +35,9 @@ class ProviderProfile(models.Model):
      is_online=models.BooleanField(default=False)
      service_radius_km = models.PositiveIntegerField(default=10)
      approval_status=models.CharField(max_length=20,choices=APPROVAL_STATUS,default='pending',db_index=True)
-     overall_rating=models.DecimalField(max_digits=10,decimal_places=2,default=0.00)
+     overall_rating=models.DecimalField(max_digits=4,decimal_places=2,default=0.00)
+     hourly_rate = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+     rejection_reason = models.TextField(blank=True)
     #  total_jobs=models.PositiveIntegerField(default=0)
     #  completion_rate=models.FloatField(default=0.0)
     #  response_speed=models.FloatField(default=0.0)
