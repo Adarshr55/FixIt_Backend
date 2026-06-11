@@ -12,6 +12,7 @@ from .serializers import (
     BookingCreateSerializer,
     BookingStatusUpdateSerializer,
 )
+from .tasks import auto_cancel_booking
 
 
 def _log_status(booking, new_status, user, note=''):
@@ -72,6 +73,12 @@ class CustomerBookingListCreateView(APIView):
             booking = serializer.save()
             # NOTE: auto_cancel Celery task goes here in Phase 3
             # auto_cancel_booking.apply_async(args=[booking.id], countdown=120)
+            if booking.booking_type=='instant':
+                auto_cancel_booking.apply_async(
+                     args     = [booking.id],
+                     countdown = 20
+                )
+
             return Response({
                 'message': 'Booking request sent. Waiting for provider.',
                 'booking': BookingSerializer(booking).data,
@@ -87,6 +94,8 @@ class ProviderBookingListView(APIView):
     def get(self, request):
         if not request.user.is_provider:
             return Response({'error': 'Only providers can access this.'}, status=status.HTTP_403_FORBIDDEN)
+        
+
 
         try:
             provider = request.user.provider_profile
@@ -98,8 +107,11 @@ class ProviderBookingListView(APIView):
         ).select_related('customer', 'category')
 
         status_filter = request.query_params.get('status')
+        booking_type_filter = request.query_params.get('booking_type') 
         if status_filter:
             bookings = bookings.filter(status=status_filter)
+        if booking_type_filter:                                             # ← add
+            bookings = bookings.filter(booking_type=booking_type_filter)# ←
 
         return Response(BookingListSerializer(bookings, many=True).data)
 
@@ -252,6 +264,9 @@ class AdminBookingActionView(APIView):
                 return Response({'error': 'note is required for dispute resolution.'}, status=status.HTTP_400_BAD_REQUEST)
             booking.status = 'completed'
             booking.save()
+            if booking.service:
+                booking.service.total_jobs += 1
+                booking.service.save(update_fields=['total_jobs', 'updated_at'])    
             _log_status(booking, 'completed', request.user, f'Dispute resolved: {note}')
             return Response({'message': 'Dispute resolved, booking marked completed.'})
 

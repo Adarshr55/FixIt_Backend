@@ -150,7 +150,7 @@ class ProviderDocumentCreateSerializer(serializers.Serializer):
             existing = ProviderDocument.objects.filter(
                 provider=provider_profile,
                 doc_type=doc_type
-        )
+        ).exclude(status='rejected')
             if existing.exists():
                 raise serializers.ValidationError(
                 {'doc_type': f'A {doc_type} document is already uploaded or under review.'}
