@@ -21,6 +21,17 @@ from .serializers import (
     UserAccountActionSerializer,
     PlatformStatsSerializer,
 )
+from notifications.services import (
+    notify_provider_approved,
+    notify_provider_rejected,
+    notify_document_approved,
+    notify_document_rejected,
+    notify_provider_suspended,
+    notify_provider_reactivated,
+    notify_service_verified,
+    notify_service_rejected,
+)
+
 
 
 # ── Shared mixin ──────────────────────────────────────────────────
@@ -150,12 +161,16 @@ class AdminProviderDetailView(AdminMixin, APIView):
             provider.user.is_active   = True
             provider.user.save(update_fields=['is_active'])
             message = f'{provider.full_name} has been approved.'
+            provider.save()
+            notify_provider_approved(provider) 
 
         elif action == 'reject':
             provider.approval_status  = 'rejected'
             provider.rejection_reason = reason
             provider.is_online        = False
             message = f'{provider.full_name} has been rejected.'
+            provider.save()
+            notify_provider_rejected(provider)
 
         elif action == 'suspend':
             provider.approval_status  = 'suspended'
@@ -164,6 +179,9 @@ class AdminProviderDetailView(AdminMixin, APIView):
             provider.user.is_active   = False
             provider.user.save(update_fields=['is_active'])
             message = f'{provider.full_name} has been suspended.'
+            provider.save()
+            notify_provider_suspended(provider)
+
 
         elif action == 'reactivate':
             provider.approval_status  = 'approved'
@@ -171,8 +189,10 @@ class AdminProviderDetailView(AdminMixin, APIView):
             provider.user.is_active   = True
             provider.user.save(update_fields=['is_active'])
             message = f'{provider.full_name} has been reactivated.'
+            provider.save()
+            notify_provider_reactivated(provider)
 
-        provider.save()
+
 
         return Response({
             'message':  message,
@@ -233,6 +253,7 @@ class AdminDocumentVerifyView(AdminMixin, APIView):
             document.verified_at   = timezone.now()
             document.reject_reason = ''
             document.save()
+            notify_document_approved(document)
 
             if document.service:
                 document.service.verification_status = 'verified'
@@ -246,6 +267,7 @@ class AdminDocumentVerifyView(AdminMixin, APIView):
             document.verified_by   = request.user
             document.verified_at   = timezone.now()
             document.save()
+            notify_document_rejected(document)
 
             if document.service and document.service.verification_status == 'verified':
                 document.service.verification_status = 'pending'
@@ -285,6 +307,7 @@ class AdminServiceVerifyView(AdminMixin, APIView):
         if action == 'verify':
             service.verification_status = 'verified'
             service.save(update_fields=['verification_status', 'updated_at'])
+            notify_service_verified(service)
             return Response({
                 'message':             f'{service.category.name} verified for {service.provider.full_name}.',
                 'verification_status': service.verification_status,
@@ -294,6 +317,7 @@ class AdminServiceVerifyView(AdminMixin, APIView):
         else:
             service.verification_status = 'rejected'
             service.save(update_fields=['verification_status', 'updated_at'])
+            notify_service_rejected(service)
             return Response({
                 'message':             f'{service.category.name} rejected for {service.provider.full_name}.',
                 'verification_status': service.verification_status,

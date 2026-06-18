@@ -29,18 +29,20 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False')=='True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -51,7 +53,9 @@ INSTALLED_APPS = [
     'bookings',
     'admin_panel',
     'customer',
-    'location'
+    'location',
+    'notifications',
+    'realtime',
 ]
 
 MIDDLEWARE = [
@@ -82,8 +86,19 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'fixit_backend.wsgi.application'
+# WSGI_APPLICATION = 'fixit_backend.wsgi.application'
+ASGI_APPLICATION = 'fixit_backend.asgi.application'
 
+
+# Add Channel Layers — Redis-backed
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [os.getenv('REDIS_URL', 'redis://localhost:6379/0')],
+        },
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases

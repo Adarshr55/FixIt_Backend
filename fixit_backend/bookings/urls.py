@@ -11,4 +11,5 @@ urlpatterns = [
     # admin
     path('admin/',views.AdminBookingListView.as_view(),name='admin-bookings'),
     path('admin/<int:pk>/',views.AdminBookingActionView.as_view(),name='admin-booking-action'),
+    path('geocode/', views.GeocodeAddressView.as_view(), name='geocode-address'),
 ]

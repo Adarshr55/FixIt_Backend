@@ -108,7 +108,7 @@ class CustomerTrackProviderView(APIView):
             )
 
         # only track when provider is actually on the way
-        if booking.status not in ['accepted', 'on_the_way', 'arrived', 'in_progress']:
+        if booking.status not in [ 'on_the_way', 'arrived']:
             return Response({
                 'message':   f'Tracking not available — booking status is {booking.status}.',
                 'status':    booking.status,

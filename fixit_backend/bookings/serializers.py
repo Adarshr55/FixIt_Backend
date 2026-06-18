@@ -2,8 +2,11 @@ from rest_framework import serializers
 from django.utils   import timezone
 from .models        import Booking, BookingStatusHistory
 from services.models import ProviderService
+from .geocoding import geocode_address
+import logging
+from decimal import Decimal
 
-
+logger = logging.getLogger(__name__)
 # ── Status history ────────────────────────────────────────────────
 
 class BookingStatusHistorySerializer(serializers.ModelSerializer):
@@ -76,10 +79,14 @@ class BookingCreateSerializer(serializers.Serializer):
     booking_type       = serializers.ChoiceField(choices=['instant', 'scheduled'], default='instant')
     issue_description  = serializers.CharField(min_length=10)
     issue_photo        = serializers.URLField(required=False, allow_blank=True)
-    customer_address   = serializers.CharField(required=False, allow_blank=True)
-    customer_latitude  = serializers.DecimalField(max_digits=10, decimal_places=6, required=False, allow_null=True)
-    customer_longitude = serializers.DecimalField(max_digits=10, decimal_places=6, required=False, allow_null=True)
+    customer_address   = serializers.CharField(required=False)
     scheduled_at       = serializers.DateTimeField(required=False, allow_null=True)
+
+
+    def validate_customer_address(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('A service address is required.')
+        return value.strip()
 
     def validate_service_id(self, value):
         try:
@@ -138,6 +145,11 @@ class BookingCreateSerializer(serializers.Serializer):
             'provider', 'category'
         ).get(id=validated_data['service_id'])
 
+        address = validated_data.get('customer_address', '')
+        coords  = geocode_address(address)
+
+        logger.error(f'DEBUG coords type: {type(coords)}, value: {coords!r}')
+
         booking = Booking.objects.create(
             customer           = customer,
             provider           = service.provider,
@@ -148,8 +160,8 @@ class BookingCreateSerializer(serializers.Serializer):
             issue_description  = validated_data['issue_description'],
             issue_photo        = validated_data.get('issue_photo', ''),
             customer_address   = validated_data.get('customer_address', ''),
-            customer_latitude  = validated_data.get('customer_latitude'),
-            customer_longitude = validated_data.get('customer_longitude'),
+            customer_latitude    = Decimal(str(coords['latitude']))  if coords else None,
+            customer_longitude   = Decimal(str(coords['longitude'])) if coords else None,
             scheduled_at       = validated_data.get('scheduled_at'),
             agreed_base_charge = service.base_charge,
             agreed_hourly_rate = service.hourly_rate,

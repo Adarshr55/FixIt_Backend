@@ -26,4 +26,5 @@ urlpatterns = [
     path('api/admin_panel/',include('admin_panel.urls')),
     path('api/customer/',include('customer.urls')),
     path('api/location/', include('location.urls')),
+    path('api/notifications/',include('notifications.urls'))
 ]
