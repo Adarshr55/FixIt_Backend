@@ -5,7 +5,7 @@ from django.conf import settings
 class CustomerProfile(models.Model):
     user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='customer_profile')
     full_name=models.CharField(max_length=100)
-    profile_photo=models.URLField(blank=True)
+    profile_photo = models.ImageField(upload_to='customer_profiles/',blank=True,null=True)
     saved_addresses=models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -26,7 +26,7 @@ class ProviderProfile(models.Model):
      ]
      user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='provider_profile')
      full_name=models.CharField(max_length=100)
-     profile_photo=models.URLField(blank=True)
+     profile_photo = models.ImageField(upload_to='provider_profiles/',blank=True,null=True)
      bio = models.TextField(blank=True)
      experience_years=models.PositiveIntegerField(default=0)
      city= models.CharField(max_length=100)
@@ -91,7 +91,7 @@ class ProviderDocument(models.Model):
     provider=models.ForeignKey(ProviderProfile,on_delete=models.CASCADE,related_name='documents')
     service=models.ForeignKey('services.ProviderService',on_delete=models.SET_NULL,null=True,blank=True,related_name='documents')
     doc_type=models.CharField(max_length=30,choices=DOC_TYPE_CHOICES)
-    file=models.URLField()
+    file = models.FileField(upload_to='provider_documents/')
     status=models.CharField(max_length=20,choices=DOC_STATUS,default='pending')
     reject_reason = models.TextField(blank=True)
     verified_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='verified_documents')
@@ -105,6 +105,76 @@ class ProviderDocument(models.Model):
 
     def __str__(self):
         return f"{self.provider.full_name}-{self.doc_type}-{self.status}"
+    
+
+
+class ProviderKYC(models.Model):
+
+
+    DOC_STATUS = [
+        ('pending',  'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    provider = models.OneToOneField(ProviderProfile,on_delete=models.CASCADE,related_name='kyc',)
+    pan_number= models.CharField(max_length=10, blank=True)
+    pan_document = models.FileField(upload_to='provider_kyc/pan/%Y/%m/', null=True, blank=True)
+    pan_status = models.CharField(max_length=20, choices=DOC_STATUS, default='pending')
+    pan_reject_reason = models.TextField(blank=True)
+    aadhaar_last4= models.CharField(max_length=4, blank=True)
+    aadhaar_document= models.FileField(upload_to='provider_kyc/aadhaar/%Y/%m/',null=True, blank=True)
+    aadhaar_status = models.CharField(max_length=20, choices=DOC_STATUS, default='pending')
+    aadhaar_reject_reason = models.TextField(blank=True)
+    kyc_verified = models.BooleanField(default=False)
+    verified_by= models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True, blank=True,related_name='kyc_verifications',)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    submitted_at= models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'provider_kyc'
+
+    def __str__(self):
+        return f'KYC — {self.provider.full_name} [{self.kyc_verified}]'
+    
+    def check_and_set_verified(self):
+        """Call after any status update — auto-sets kyc_verified."""
+        if self.pan_status == 'approved' and self.aadhaar_status == 'approved':
+            self.kyc_verified = True
+        else:
+            self.kyc_verified = False
+        self.save(update_fields=['kyc_verified', 'updated_at'])
+
+
+class ProviderBankAccount(models.Model):
+
+    provider = models.OneToOneField(ProviderProfile,on_delete=models.CASCADE,related_name='bank_account',)
+
+    account_holder_name = models.CharField(max_length=100, blank=True)
+    account_number      = models.CharField(max_length=20, blank=True)
+    ifsc_code           = models.CharField(max_length=11, blank=True)
+
+    # Auto-filled from free Razorpay IFSC API
+    bank_name           = models.CharField(max_length=100, blank=True)
+    branch_name         = models.CharField(max_length=100, blank=True)
+
+    passbook_document   = models.FileField(upload_to='provider_bank/%Y/%m/',null=True, blank=True)
+
+    is_verified   = models.BooleanField(default=False)
+    reject_reason = models.TextField(blank=True)
+
+    verified_by  = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True, blank=True,related_name='bank_verifications',)
+    verified_at  = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'provider_bank_accounts'
+
+    def __str__(self):
+        return f'Bank — {self.provider.full_name} [{self.ifsc_code}]'
+
 
 
 

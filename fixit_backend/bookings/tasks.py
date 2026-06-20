@@ -1,7 +1,7 @@
 from celery import shared_task
 import logging
 from notifications.services import(
-     notify_booking_cancelled,notify_booking_reminder
+     notify_booking_cancelled, notify_booking_reminder, notify_customer_booking_reminder
 )
 logger=logging.getLogger(__name__)
 
@@ -85,6 +85,25 @@ def send_scheduled_booking_reminder(self,booking_id):
         return
        
        notify_booking_reminder(booking)
+       notify_customer_booking_reminder(booking)
+       
+       try:
+           from channels.layers import get_channel_layer
+           from asgiref.sync import async_to_sync
+           from bookings.serializers import BookingListSerializer
+           
+           channel_layer = get_channel_layer()
+           async_to_sync(channel_layer.group_send)(
+               f'provider_{booking.provider_id}_bookings',
+               {
+                   'type':       'booking_event',
+                   'event_type': 'reminder_unmasked',
+                   'booking':    BookingListSerializer(booking).data,
+               }
+           )
+       except Exception as ws_err:
+           logger.warning(f'WS reminder push failed: {ws_err}')
+           
        logger.info(
         f'Reminder: Booking #{booking_id} is in 1 hour. '
         f'Provider: {booking.provider.full_name}'

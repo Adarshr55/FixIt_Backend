@@ -230,7 +230,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                 if self.role !='provider':
                     return
                 booking_status = await self.get_booking_status()
-                if booking_status not in ['accepted', 'on_the_way', 'arrived', 'in_progress']:
+                if booking_status not in ['on_the_way', 'arrived']:
                     return
                 # provider is sending their live GPS
                 lat = data.get('latitude')

@@ -57,6 +57,14 @@ def notify(user,notification_type,title,message,booking=None):
 
 def notify_booking_requested(booking):
      """Provider receives new booking alert."""
+     from django.utils import timezone
+     from datetime import timedelta
+     
+     address_str = booking.customer_address
+     if booking.booking_type == 'scheduled' and booking.scheduled_at:
+         if booking.scheduled_at > timezone.now() + timedelta(hours=1):
+             address_str = "[Masked until 1 hour before service]"
+             
      notify(
           user=booking.provider.user,
           notification_type='booking_requested',
@@ -65,7 +73,7 @@ def notify_booking_requested(booking):
                 f'{booking.customer.customer_profile.full_name} wants to book '
                 f'{booking.category.name}. '
                 f'Base charge: ₹{booking.agreed_base_charge}. '
-                f'Address: {booking.customer_address}.'
+                f'Address: {address_str}.'
           ),
           booking=booking
       )
@@ -216,6 +224,20 @@ def notify_booking_reminder(booking):
         booking= booking,
     )
 
+def notify_customer_booking_reminder(booking):
+    """Customer reminder for upcoming scheduled booking."""
+    notify(
+        user=booking.customer,
+        notification_type='booking_reminder_customer',
+        title='Upcoming Booking Reminder',
+        message=(
+            f'Your {booking.category.name} booking with {booking.provider.full_name} '
+            f'is scheduled for {booking.scheduled_at.strftime("%I:%M %p")}. '
+            f'Provider will start travel shortly.'
+        ),
+        booking=booking,
+    )
+
 
 
 def notify_provider_approved(provider_profile):
@@ -312,4 +334,125 @@ def notify_service_rejected(service):
             f'Please review your documents and try again.'
         ),
     )
+
+
+
+def notify_review_submitted(review):
+    """Provider learns they received a new review."""
+    stars = '★' * review.rating + '☆' * (5 - review.rating)
+    notify(
+        user              = review.provider.user,
+        notification_type = 'review_received',
+        title             = 'New Review Received',
+        message           = (
+            f'You received a {review.rating}-star review '
+            f'{stars} for your {review.service.category.name if review.service else "service"}. '
+            f'"{review.comment[:80]}{"..." if len(review.comment) > 80 else ""}"'
+        ),
+        booking=review.booking,
+    )
+
+
+def notify_kyc_submitted(kyc):
+    """All admins notified when a provider submits KYC."""
+    from accounts.models import User
+    admins = User.objects.filter(role='admin', is_active=True)
+    for admin in admins:
+        notify(
+            user=admin,
+            notification_type='kyc_submitted',
+            title='New KYC Submission',
+            message=(
+                f'{kyc.provider.full_name} has submitted KYC documents '
+                f'(PAN + Aadhaar) for verification.'
+            ),
+        )
+
+def notify_kyc_pan_approved(provider):
+    notify(
+        user=provider.user,
+        notification_type='kyc_pan_approved',
+        title='PAN Card Approved',
+        message='Your PAN card has been verified successfully.',
+    )
+
+def notify_kyc_pan_rejected(provider, reason):
+    notify(
+        user=provider.user,
+        notification_type='kyc_pan_rejected',
+        title='PAN Card Rejected',
+        message=(
+            f'Your PAN card verification was rejected. '
+            f'Reason: {reason}. Please resubmit with a clearer document.'
+        ),
+    )
+
+def notify_kyc_aadhaar_approved(provider):
+    notify(
+        user=provider.user,
+        notification_type='kyc_aadhaar_approved',
+        title='Aadhaar Verified',
+        message='Your Aadhaar document has been verified successfully.',
+    )
+
+def notify_kyc_aadhaar_rejected(provider, reason):
+    notify(
+        user=provider.user,
+        notification_type='kyc_aadhaar_rejected',
+        title='Aadhaar Rejected',
+        message=(
+            f'Your Aadhaar verification was rejected. '
+            f'Reason: {reason}. Please resubmit with a clearer document.'
+        ),
+    )
+
+def notify_kyc_fully_verified(provider):
+    notify(
+        user=provider.user,
+        notification_type='kyc_verified',
+        title='KYC Fully Verified',
+        message=(
+            'Your KYC is complete. You can now add your bank account '
+            'and request withdrawals once verified.'
+        ),
+    )
+
+def notify_bank_account_submitted(bank):
+    """All admins notified when provider submits bank details."""
+    from accounts.models import User
+    admins = User.objects.filter(role='admin', is_active=True)
+    for admin in admins:
+        notify(
+            user=admin,
+            notification_type='bank_submitted',
+            title='Bank Account Pending Verification',
+            message=(
+                f'{bank.provider.full_name} submitted bank account '
+                f'({bank.bank_name} — {bank.ifsc_code}) for verification.'
+            ),
+        )
+
+def notify_bank_account_approved(bank):
+    notify(
+        user=bank.provider.user,
+        notification_type='bank_approved',
+        title='Bank Account Verified',
+        message=(
+            f'Your bank account ({bank.bank_name}) has been verified. '
+            f'You can now request withdrawals.'
+        ),
+    )
+
+def notify_bank_account_rejected(bank, reason):
+    notify(
+        user=bank.provider.user,
+        notification_type='bank_rejected',
+        title='Bank Account Rejected',
+        message=(
+            f'Your bank account verification was rejected. '
+            f'Reason: {reason}. Please resubmit with correct details.'
+        ),
+    )
+
+
      

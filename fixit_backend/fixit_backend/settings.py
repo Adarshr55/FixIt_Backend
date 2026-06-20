@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'location',
     'notifications',
     'realtime',
+    'reviews'
 ]
 
 MIDDLEWARE = [
@@ -175,6 +176,10 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
+
+
+RAZORPAY_KEY_ID =os.getenv('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET')
 
 
 # Static files (CSS, JavaScript, Images)

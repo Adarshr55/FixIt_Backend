@@ -258,6 +258,7 @@ class BookingStatusUpdateView(APIView):
             if booking.service:
                 booking.service.total_jobs += 1
                 booking.service.save(update_fields=['total_jobs', 'updated_at'])
+            _push_booking_event(booking, 'completed_review_prompt')
 
         elif new_status == 'cancelled':
             booking.cancelled_by  = role

@@ -36,7 +36,21 @@ class Notification(models.Model):
         ('payment_received',    'Payment Received'),
         ('withdrawal_approved', 'Withdrawal Approved'),
         ('withdrawal_rejected', 'Withdrawal Rejected'),
-    ]
+
+        ('provider_flagged', 'Provider Auto-Flagged'),
+        ('review_received', 'Review Received'),
+        ('booking_reminder_customer', 'Customer Booking Reminder'),
+
+        ('kyc_submitted', 'KYC Submitted'),
+        ('kyc_pan_approved','PAN Approved'),
+        ('kyc_pan_rejected','PAN Rejected'),
+        ('kyc_aadhaar_approved','Aadhaar Approved'),
+        ('kyc_aadhaar_rejected','Aadhaar Rejected'),
+        ('kyc_verified','KYC Fully Verified'),
+        ('bank_submitted','Bank Account Submitted'),
+        ('bank_approved','Bank Account Approved'),
+        ('bank_rejected','Bank Account Rejected'),
+            ]
     
      user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='notifications')
      notification_type=models.CharField(max_length=30,choices=NOTIFICATION_TYPES,db_index=True)

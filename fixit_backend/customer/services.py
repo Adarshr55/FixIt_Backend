@@ -26,12 +26,22 @@ class ProviderDiscoveryService:
         except ServiceCategory.DoesNotExist:
             raise
 
+        from bookings.models import Booking
+        from django.db.models import Q
+
+        busy_provider_ids = Booking.objects.filter(
+            Q(status__in=['on_the_way', 'arrived', 'in_progress']) |
+            Q(booking_type='instant', status='accepted')
+        ).values_list('provider_id', flat=True)
+
         services = ProviderService.objects.filter(
             category                  = category,
             verification_status       = 'verified',
             is_active                 = True,
             provider__approval_status = 'approved',
             provider__is_online       = True,
+        ).exclude(
+            provider_id__in=busy_provider_ids
         ).select_related('provider', 'category')
 
         ranked = self.backend.find_nearby(services, customer_lat, customer_lng)

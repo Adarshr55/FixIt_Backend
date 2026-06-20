@@ -50,7 +50,7 @@ class ProviderLocationUpdateView(APIView):
                 booking = Booking.objects.get(
                     pk       = booking_id,
                     provider = profile,
-                    status__in = ['accepted', 'on_the_way', 'arrived', 'in_progress'],
+                    status__in = ['on_the_way', 'arrived'],
                 )
             except Booking.DoesNotExist:
                 return Response(
@@ -107,8 +107,8 @@ class CustomerTrackProviderView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # only track when provider is actually on the way
-        if booking.status not in [ 'on_the_way', 'arrived']:
+        # only track during active stages
+        if booking.status not in ['on_the_way', 'arrived']:
             return Response({
                 'message':   f'Tracking not available — booking status is {booking.status}.',
                 'status':    booking.status,
