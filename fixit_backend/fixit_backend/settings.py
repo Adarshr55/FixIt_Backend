@@ -56,7 +56,10 @@ INSTALLED_APPS = [
     'location',
     'notifications',
     'realtime',
-    'reviews'
+    'reviews',
+    'payments',
+    'public_api',
+    'marketing'
 ]
 
 MIDDLEWARE = [
@@ -143,7 +146,17 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS=[
     'http://localhost:3000',
     'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
 ]
+
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', 'redis://localhost:6379/1'),
+    }
+}
 
 CORS_ALLOWED_CREDENTIALS=True
 
@@ -190,7 +203,14 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL   = '/media/'
 MEDIA_ROOT  = BASE_DIR / 'media'
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_CREDENTIALS = True
+
+
+FIXIT_COMMISSION_RATE  = 0.10   # 10%
+FIXIT_MIN_WITHDRAWAL   = 100    # ₹100 minimum withdrawal
+RAZORPAY_WEBHOOK_SECRET = os.getenv('RAZORPAY_WEBHOOK_SECRET')
 
 # CELERY CONFIGURATION
 CELERY_BROKER_URL =os.getenv('REDIS_URL','redis://localhost:6379/0')

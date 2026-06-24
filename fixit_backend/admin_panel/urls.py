@@ -21,4 +21,14 @@ urlpatterns = [
 
     # user account actions
     path('users/<int:user_id>/action/',views.AdminUserActionView.as_view(),     name='admin-user-action'),
-]
+
+    # CMS & Category Management
+    path('categories/', views.AdminCategoryListView.as_view(), name='admin-category-list'),
+    path('categories/<int:pk>/', views.AdminCategoryDetailView.as_view(), name='admin-category-detail'),
+    path('cms-sections/', views.AdminCMSSectionListView.as_view(), name='admin-cms-section-list'),
+    path('cms-sections/<str:pk_or_key>/', views.AdminCMSSectionDetailView.as_view(), name='admin-cms-section-detail'),
+    path('promo-banners/', views.AdminPromoBannerListView.as_view(), name='admin-promo-banner-list'),
+    path('promo-banners/<int:pk>/', views.AdminPromoBannerDetailView.as_view(), name='admin-promo-banner-detail'),
+    path('how-it-works-steps/', views.AdminHowItWorksStepListView.as_view(), name='admin-how-it-works-step-list'),
+    path('how-it-works-steps/<int:pk>/', views.AdminHowItWorksStepDetailView.as_view(), name='admin-how-it-works-step-detail'),
+]

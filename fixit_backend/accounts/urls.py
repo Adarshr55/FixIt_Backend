@@ -10,5 +10,5 @@ urlpatterns=[
     path('me/',views.MeView.as_view()),
     path('change-password/',views.ChangePasswordView.as_view()),
     path('admin/create/',views.AdminCreateView.as_view()),
-    path('token/refresh/',TokenRefreshView.as_view())
+    path('token/refresh/',views.CustomTokenRefreshView.as_view())
 ]

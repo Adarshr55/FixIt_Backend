@@ -118,7 +118,7 @@ class CustomerBookingListCreateView(APIView):
 
             return Response({
                 'message': 'Booking request sent. Waiting for provider.',
-                'booking': BookingSerializer(booking).data,
+                'booking': BookingSerializer(booking, context={'request': request}).data,
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -209,7 +209,7 @@ class BookingDetailView(APIView):
         booking = self._get_booking(request, pk)
         if not booking:
             return Response({'error': 'Booking not found.'}, status=status.HTTP_404_NOT_FOUND)
-        return Response(BookingSerializer(booking).data)
+        return Response(BookingSerializer(booking, context={'request': request}).data)
 
 
 # ── Status update — single view handles all transitions ──────────
@@ -305,7 +305,7 @@ class BookingStatusUpdateView(APIView):
 
         return Response({
             'message': f'Booking status updated to {new_status}.',
-            'booking': BookingSerializer(booking).data,
+            'booking': BookingSerializer(booking, context={'request': request}).data,
         })
 
 

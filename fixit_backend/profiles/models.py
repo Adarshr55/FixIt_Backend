@@ -15,6 +15,30 @@ class CustomerProfile(models.Model):
 
     def __str__(self):
         return f"customer:{self.user.email}"
+
+
+class CustomerAddress(models.Model):
+    customer = models.ForeignKey(CustomerProfile, on_delete=models.CASCADE, related_name='addresses')
+    label = models.CharField(max_length=50)  # Home, Work, Other, or custom labels
+    address = models.TextField()
+    latitude = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'customer_addresses'
+        ordering = ['-is_default', '-created_at']
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            # Set all other addresses for this customer to is_default=False
+            CustomerAddress.objects.filter(customer=self.customer, is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.customer.user.email} - {self.label}: {self.address[:30]}"
     
 
 class ProviderProfile(models.Model):
@@ -32,7 +56,7 @@ class ProviderProfile(models.Model):
      city= models.CharField(max_length=100)
      latitude=models.DecimalField(max_digits=10,decimal_places=6,blank=True,null=True)
      longitude=models.DecimalField(max_digits=10,decimal_places=6,blank=True,null=True)
-     is_online=models.BooleanField(default=False)
+     is_online=models.BooleanField(default=False,db_index=True)
      service_radius_km = models.PositiveIntegerField(default=10)
      approval_status=models.CharField(max_length=20,choices=APPROVAL_STATUS,default='pending',db_index=True)
      overall_rating=models.DecimalField(max_digits=4,decimal_places=2,default=0.00)

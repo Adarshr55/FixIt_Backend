@@ -1,21 +1,24 @@
 from django.shortcuts import render
-from .models import ProviderProfile,CustomerProfile,ProviderDocument,ProviderBankAccount,ProviderKYC
+from .models import ProviderProfile,CustomerProfile,ProviderDocument,ProviderBankAccount,ProviderKYC,CustomerAddress
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response  import Response
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from accounts.permissions import IsPlatformAdmin
 from django.utils import timezone
 from .serializers import(
     ProviderProfileSerializer,CustomerProfileSerializer,ProviderDocumentSerializer,
     CustomerProfileCreateSerializer,ProviderProfileCreateSerializer,ProviderDocumentCreateSerializer,ProviderKYCSerializer,
     ProviderKYCSubmitSerializer,AdminKYCActionSerializer,ProviderBankAccountSerializer,ProviderBankAccountSubmitSerializer,
-    AdminBankAccountActionSerializer
+    AdminBankAccountActionSerializer, AdminProviderKYCSerializer, AdminProviderBankAccountSerializer,
+    CustomerAddressSerializer
     )
 # Create your views here.
 
 class CustomerProfileView(APIView):
     permission_classes=[IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     def get(self,request):
         if not request.user.is_customer:
             return Response(
@@ -24,7 +27,7 @@ class CustomerProfileView(APIView):
             )
         try:
             profile=request.user.customer_profile
-            serializer=CustomerProfileSerializer(profile)
+            serializer=CustomerProfileSerializer(profile, context={'request': request})
             return Response(serializer.data,status=status.HTTP_200_OK)
         except CustomerProfile.DoesNotExist:
             return Response(
@@ -43,7 +46,7 @@ class CustomerProfileView(APIView):
             profile=serializer.save()
             return Response({
                 'message': 'Profile created successfully.',
-                'profile': CustomerProfileSerializer(profile).data,
+                'profile': CustomerProfileSerializer(profile, context={'request': request}).data,
             },status=status.HTTP_201_CREATED)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
     
@@ -70,13 +73,14 @@ class CustomerProfileView(APIView):
             profile = serializer.save()
             return Response({
                 'message':'profile updated',
-                'profile':CustomerProfileSerializer(profile).data
+                'profile':CustomerProfileSerializer(profile, context={'request': request}).data
             })
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
     
 
 class ProviderProfileView(APIView):
     permission_classes=[IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     def get(self, request):
         if not request.user.is_provider:
             return Response(
@@ -85,7 +89,7 @@ class ProviderProfileView(APIView):
             )
         try:
             profile    = request.user.provider_profile
-            serializer = ProviderProfileSerializer(profile)
+            serializer = ProviderProfileSerializer(profile, context={'request': request})
             return Response(serializer.data)
         except ProviderProfile.DoesNotExist:
             return Response(
@@ -103,7 +107,7 @@ class ProviderProfileView(APIView):
             profile=serializer.save()
             return Response({
                 'message': 'Profile submitted for review.',
-                'profile': ProviderProfileSerializer(profile).data,
+                'profile': ProviderProfileSerializer(profile, context={'request': request}).data,
             },status=status.HTTP_201_CREATED)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
     
@@ -130,13 +134,14 @@ class ProviderProfileView(APIView):
         if serializer.is_valid():
             profile = serializer.save()
             return Response(
-            ProviderProfileSerializer(profile).data,
-            status=status.HTTP_200_OK,
+                ProviderProfileSerializer(profile, context={'request': request}).data,
+                status=status.HTTP_200_OK,
             )
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
     
 class ProviderDocumentView(APIView):
     permission_classes=[IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self,request):
         if not request.user.is_provider:
@@ -146,7 +151,7 @@ class ProviderDocumentView(APIView):
             )
         try:
             document=request.user.provider_profile.documents.all()
-            serializer=ProviderDocumentSerializer(document,many=True)
+            serializer=ProviderDocumentSerializer(document,many=True,context={'request': request})
             return Response (serializer.data,status=status.HTTP_200_OK)
         except ProviderProfile.DoesNotExist:
             return Response( {'error': 'Complete your profile first.'},
@@ -165,7 +170,7 @@ class ProviderDocumentView(APIView):
         serializer.is_valid(raise_exception=True)
         document = serializer.save()
         return Response(
-            ProviderDocumentSerializer(document).data,
+            ProviderDocumentSerializer(document, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
 class ProfileStatusView(APIView):
@@ -204,6 +209,7 @@ class ProviderKYCView(APIView):
     Must use multipart/form-data for file upload.
     """
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         if not request.user.is_provider:
@@ -213,7 +219,7 @@ class ProviderKYCView(APIView):
             )
         try:
             kyc = request.user.provider_profile.kyc
-            return Response(ProviderKYCSerializer(kyc).data)
+            return Response(ProviderKYCSerializer(kyc, context={'request': request}).data)
         except ProviderKYC.DoesNotExist:
             return Response({
                 'kyc_verified': False,
@@ -256,7 +262,7 @@ class ProviderKYCView(APIView):
             notify_kyc_submitted(kyc)
             return Response({
                 'message': 'KYC submitted successfully. Admin will verify within 24-48 hours.',
-                'kyc': ProviderKYCSerializer(kyc).data,
+                'kyc': ProviderKYCSerializer(kyc, context={'request': request}).data,
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -342,6 +348,7 @@ class ProviderBankAccountView(APIView):
     Must use multipart/form-data.
     """
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         if not request.user.is_provider:
@@ -373,6 +380,19 @@ class ProviderBankAccountView(APIView):
                 {'error': 'Complete your provider profile first.'},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+        try:
+            kyc = profile.kyc
+            if not kyc.kyc_verified:
+                return Response(
+                {'error': 'Complete identity verification (KYC) before adding bank details.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except ProviderKYC.DoesNotExist:
+            return Response(
+            {'error': 'Submit your KYC documents before adding bank details.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
         # block changes if already verified
         try:
@@ -507,5 +527,191 @@ class IFSCLookupView(APIView):
                 {'error': 'IFSC lookup service unavailable.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
+
+
+class AdminKYCListView(APIView):
+    """
+    GET /api/profiles/admin/kyc/
+    List all provider KYC submissions.
+    """
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
+    def get(self, request):
+        status_filter = request.query_params.get('status')
+        kycs = ProviderKYC.objects.select_related('provider__user').all().order_by('-submitted_at')
+        
+        if status_filter == 'pending':
+            kycs = kycs.filter(kyc_verified=False)
+        elif status_filter == 'verified':
+            kycs = kycs.filter(kyc_verified=True)
+            
+        serializer = AdminProviderKYCSerializer(kycs, many=True, context={'request': request})
+        return Response({
+            'count': kycs.count(),
+            'results': serializer.data
+        })
+
+
+class AdminBankAccountListView(APIView):
+    """
+    GET /api/profiles/admin/bank-account/
+    List all provider Bank account details.
+    """
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
+    def get(self, request):
+        status_filter = request.query_params.get('status')
+        banks = ProviderBankAccount.objects.select_related('provider__user').all().order_by('-submitted_at')
+        
+        if status_filter == 'pending':
+            banks = banks.filter(is_verified=False)
+        elif status_filter == 'verified':
+            banks = banks.filter(is_verified=True)
+            
+        serializer = AdminProviderBankAccountSerializer(banks, many=True, context={'request': request})
+        return Response({
+            'count': banks.count(),
+            'results': serializer.data
+        })
+
+
+class CustomerAddressListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_customer:
+            return Response(
+                {'error': 'Only customers can access this.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        try:
+            profile = request.user.customer_profile
+            addresses = CustomerAddress.objects.filter(customer=profile)
+            serializer = CustomerAddressSerializer(addresses, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except CustomerProfile.DoesNotExist:
+            return Response(
+                {"error": "Customer profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def post(self, request):
+        if not request.user.is_customer:
+            return Response(
+                {'error': 'Only customers can access this.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        try:
+            profile = request.user.customer_profile
+        except CustomerProfile.DoesNotExist:
+            return Response(
+                {"error": "Customer profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = CustomerAddressSerializer(data=request.data)
+        if serializer.is_valid():
+            is_default = serializer.validated_data.get('is_default', False)
+            if not CustomerAddress.objects.filter(customer=profile).exists():
+                is_default = True
+            
+            address = serializer.save(customer=profile, is_default=is_default)
+            return Response(CustomerAddressSerializer(address).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CustomerAddressDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk, profile):
+        try:
+            return CustomerAddress.objects.get(pk=pk, customer=profile)
+        except CustomerAddress.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        if not request.user.is_customer:
+            return Response(
+                {'error': 'Only customers can access this.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        try:
+            profile = request.user.customer_profile
+        except CustomerProfile.DoesNotExist:
+            return Response(
+                {"error": "Customer profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        address = self.get_object(pk, profile)
+        if not address:
+            return Response(
+                {"error": "Address not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = CustomerAddressSerializer(address)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        if not request.user.is_customer:
+            return Response(
+                {'error': 'Only customers can access this.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        try:
+            profile = request.user.customer_profile
+        except CustomerProfile.DoesNotExist:
+            return Response(
+                {"error": "Customer profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        address = self.get_object(pk, profile)
+        if not address:
+            return Response(
+                {"error": "Address not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = CustomerAddressSerializer(address, data=request.data, partial=True)
+        if serializer.is_valid():
+            saved_address = serializer.save()
+            
+            if not saved_address.is_default:
+                if not CustomerAddress.objects.filter(customer=profile, is_default=True).exists():
+                    other = CustomerAddress.objects.filter(customer=profile).order_by('-updated_at').first()
+                    if other:
+                        other.is_default = True
+                        other.save()
+            return Response(CustomerAddressSerializer(saved_address).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        if not request.user.is_customer:
+            return Response(
+                {'error': 'Only customers can access this.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        try:
+            profile = request.user.customer_profile
+        except CustomerProfile.DoesNotExist:
+            return Response(
+                {"error": "Customer profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        address = self.get_object(pk, profile)
+        if not address:
+            return Response(
+                {"error": "Address not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        was_default = address.is_default
+        address.delete()
+        
+        if was_default:
+            other = CustomerAddress.objects.filter(customer=profile).order_by('-created_at').first()
+            if other:
+                other.is_default = True
+                other.save()
+                
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
         

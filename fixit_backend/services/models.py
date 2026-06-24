@@ -15,11 +15,27 @@ class ServiceCategory(models.Model):
     skill_tags=models.JSONField(default=list)
     created_at=models.DateTimeField(auto_now_add=True)
 
+    slug              = models.SlugField(max_length=120, unique=True, db_index=True, blank=True,)
+    short_description = models.CharField(max_length=255, blank=True)
+    image             = models.ImageField(upload_to='categories/', blank=True, null=True)
+    image_url         = models.URLField(max_length=500, blank=True)
+    seo_title         = models.CharField(max_length=150, blank=True)
+    seo_description   = models.TextField(blank=True)
+    seo_keywords      = models.CharField(max_length=255, blank=True)
+    display_order     = models.PositiveIntegerField(default=0, db_index=True)
+    is_featured       = models.BooleanField(default=False, db_index=True)
+
     class Meta:
         db_table='service_categories'
         verbose_name='Service Category'
         verbose_name_plural='Service Categories'
         ordering=['group', 'name']
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name}-({self.get_group_display()})"
@@ -38,7 +54,7 @@ class ProviderService(models.Model):
      base_charge=models.DecimalField(max_digits=10,decimal_places=2)
      hourly_rate=models.DecimalField(max_digits=8,decimal_places=2)
      extra_info  = models.JSONField(default=dict)
-     verification_status=models.CharField(max_length=20,choices=VERIFICATION_STATUS,default='unverified')
+     verification_status=models.CharField(max_length=20,choices=VERIFICATION_STATUS,default='unverified',db_index=True)
      service_rating=models.DecimalField(max_digits=4,decimal_places=2,default=0.00)
      total_jobs=models.PositiveIntegerField(default=0)
      completion_rate= models.FloatField(default=0.0)   

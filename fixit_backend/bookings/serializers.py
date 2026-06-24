@@ -68,6 +68,7 @@ class BookingListSerializer(serializers.ModelSerializer):
             'agreed_base_charge', 'agreed_hourly_rate',
             'is_active', 'is_cancellable', 'created_at','customer_email',
             'prep_window_start_time', 'is_prep_window_active', 'is_service_start_reached',
+            'payment_status', 'payment_method',
         ]
 
     def get_prep_window_start_time(self, obj):
@@ -122,6 +123,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'customer_address', 'customer_latitude', 'customer_longitude',
             'scheduled_at',
             'agreed_base_charge', 'agreed_hourly_rate', 'final_amount',
+            'payment_status', 'payment_method',
             'cancelled_by', 'cancel_reason',
             'reject_reason', 'dispute_reason',
             'accepted_at', 'started_at', 'completed_at',
@@ -165,7 +167,7 @@ class BookingCreateSerializer(serializers.Serializer):
     service_id         = serializers.IntegerField()
     booking_type       = serializers.ChoiceField(choices=['instant', 'scheduled'], default='instant')
     issue_description  = serializers.CharField(min_length=10)
-    issue_photo        = serializers.URLField(required=False, allow_blank=True)
+    issue_photo        = serializers.ImageField(required=False, allow_null=True)
     customer_address   = serializers.CharField(required=False)
     scheduled_at       = serializers.DateTimeField(required=False, allow_null=True)
 
@@ -308,7 +310,7 @@ class BookingCreateSerializer(serializers.Serializer):
             booking_type       = validated_data.get('booking_type', 'instant'),
             status             = 'requested',
             issue_description  = validated_data['issue_description'],
-            issue_photo        = validated_data.get('issue_photo', ''),
+            issue_photo        = validated_data.get('issue_photo'),
             customer_address   = validated_data.get('customer_address', ''),
             customer_latitude    = Decimal(str(coords['latitude']))  if coords else None,
             customer_longitude   = Decimal(str(coords['longitude'])) if coords else None,

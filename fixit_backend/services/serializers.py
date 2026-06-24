@@ -3,9 +3,30 @@ from.models import ServiceCategory,ProviderService,ProviderAvailability
 
 class ServiceCategorySerializer(serializers.ModelSerializer):
     group_label = serializers.CharField(source='get_group_display', read_only=True)
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model=ServiceCategory
-        fields=['id','name','group','group_label','icon','description','skill_tags']
+        fields=['id','name','group','group_label','icon','description','skill_tags',
+            'slug',
+            'short_description',
+            'image',
+            'image_url',         
+            'display_order',    
+            'is_featured',
+            'seo_title',
+            'seo_description',
+            'seo_keywords',
+        ]
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        if obj.image:
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.image_url or None
+
 
 class ProviderServiceSerializer(serializers.ModelSerializer):
      category_name  = serializers.CharField(source='category.name',  read_only=True)

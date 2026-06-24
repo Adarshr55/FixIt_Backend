@@ -19,7 +19,7 @@ class Review(models.Model):
       provider = models.ForeignKey('profiles.ProviderProfile',on_delete=models.CASCADE,related_name='reviews_received')
       service  = models.ForeignKey('services.ProviderService',on_delete=models.SET_NULL,null=True,related_name='reviews',)
         # SET_NULL — review survives even if provider removes service
-      rating=models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
+      rating=models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)],db_index=True)
       comment=models.TextField(blank=True)
       is_flagged = models.BooleanField(default=False)
       created_at=models.DateTimeField(auto_now_add=True)
@@ -76,7 +76,7 @@ class Report(models.Model):
         ordering = ['-created_at']
     def __str__(self):return (f'Report by {self.customer.email} 'f'against {self.provider.full_name} 'f'— {self.reason} ({self.status})')
 
-    
+
 
 
     

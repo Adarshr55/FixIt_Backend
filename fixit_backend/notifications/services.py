@@ -455,4 +455,101 @@ def notify_bank_account_rejected(bank, reason):
     )
 
 
+
+def notify_payment_received(payment, provider_earning):
+    """Both parties notified on Razorpay payment success."""
+    notify(
+        user=payment.customer,
+        notification_type='payment_received',
+        title='Payment Successful',
+        message=(
+            f'Payment of ₹{payment.amount} for your '
+            f'{payment.booking.category.name} service was successful.'
+        ),
+        booking=payment.booking,
+    )
+    notify(
+        user=payment.provider.user,
+        notification_type='payment_received',
+        title='Payment Received',
+        message=(
+            f'₹{provider_earning} has been credited to your wallet '
+            f'for Booking#{payment.booking.id}.'
+        ),
+        booking=payment.booking,
+    )
+
+def notify_cash_payment_confirmed(payment, provider_earning):
+    """Provider confirmed cash collected."""
+    notify(
+        user=payment.customer,
+        notification_type='payment_received',
+        title='Cash Payment Confirmed',
+        message=(
+            f'Your cash payment of ₹{payment.amount} for '
+            f'{payment.booking.category.name} has been confirmed.'
+        ),
+        booking=payment.booking,
+    )
+    notify(
+        user=payment.provider.user,
+        notification_type='payment_received',
+        title='Cash Collected',
+        message=(
+            f'Cash payment confirmed for Booking#{payment.booking.id}. '
+            f'Platform commission of ₹{payment.platform_commission} '
+            f'has been deducted from your wallet.'
+        ),
+        booking=payment.booking,
+    )
+
+def notify_withdrawal_requested(withdrawal):
+    """Admins notified of new withdrawal request."""
+    from accounts.models import User
+    admins = User.objects.filter(role='admin', is_active=True)
+    for admin in admins:
+        notify(
+            user=admin,
+            notification_type='withdrawal_approved',
+            title='New Withdrawal Request',
+            message=(
+                f'{withdrawal.provider.full_name} requested withdrawal of '
+                f'₹{withdrawal.amount} via {withdrawal.payout_method.upper()}.'
+            ),
+        )
+
+def notify_withdrawal_approved(withdrawal):
+    notify(
+        user=withdrawal.provider.user,
+        notification_type='withdrawal_approved',
+        title='Withdrawal Approved',
+        message=(
+            f'Your withdrawal of ₹{withdrawal.amount} has been approved '
+            f'and will be processed shortly.'
+        ),
+    )
+
+def notify_withdrawal_rejected(withdrawal):
+    notify(
+        user=withdrawal.provider.user,
+        notification_type='withdrawal_rejected',
+        title='Withdrawal Rejected',
+        message=(
+            f'Your withdrawal of ₹{withdrawal.amount} was rejected. '
+            f'Reason: {withdrawal.admin_note}. '
+            f'Amount has been refunded to your wallet.'
+        ),
+    )
+
+def notify_withdrawal_processed(withdrawal):
+    notify(
+        user=withdrawal.provider.user,
+        notification_type='withdrawal_approved',
+        title='Withdrawal Processed',
+        message=(
+            f'₹{withdrawal.amount} has been sent to your '
+            f'{"UPI " + withdrawal.upi_id if withdrawal.payout_method == "upi" else "bank account"}. '
+            f'Please allow 1-2 business days.'
+        ),
+    )
      

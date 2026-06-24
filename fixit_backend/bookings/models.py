@@ -27,6 +27,18 @@ class Booking(models.Model):
         ('system',   'System'),    # reserved for Celery auto-cancel later
     ]
 
+    PAYMENT_METHOD_CHOICES = [
+    ('razorpay', 'Razorpay'),
+    ('cash',     'Cash'),
+    ]
+
+    PAYMENT_STATUS_CHOICES = [
+    ('unpaid',   'Unpaid'),
+    ('paid',     'Paid'),
+    ('refunded', 'Refunded'),
+    ]
+
+
     # ── Relations ────────────────────────────────────────────────
     customer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -61,7 +73,7 @@ class Booking(models.Model):
     booking_type      = models.CharField(max_length=20, choices=BOOKING_TYPE_CHOICES, default='instant')
     status            = models.CharField(max_length=20, choices=STATUS_CHOICES, default='requested', db_index=True)
     issue_description = models.TextField()
-    issue_photo       = models.URLField(blank=True)
+    issue_photo       = models.ImageField(upload_to='booking_issues/', blank=True, null=True)
 
     # ── Customer location ────────────────────────────────────────
     customer_address   = models.TextField(blank=True)
@@ -75,7 +87,9 @@ class Booking(models.Model):
     # ── Pricing snapshot ─────────────────────────────────────────
     agreed_base_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     agreed_hourly_rate = models.DecimalField(max_digits=8,  decimal_places=2, null=True, blank=True)
-    final_amount       = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    final_amount= models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    payment_status = models.CharField(max_length=20,choices=PAYMENT_STATUS_CHOICES,default='unpaid',db_index=True,)
+    payment_method = models.CharField(max_length=20,choices=PAYMENT_METHOD_CHOICES,default='razorpay',)
     # final_amount set by provider when completing
     # Payments phase uses this to calculate commission
 

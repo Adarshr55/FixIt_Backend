@@ -12,14 +12,19 @@ class AdminDocumentSerializer(serializers.ModelSerializer):
         read_only=True,
         default=None,
     )
+    file_url = serializers.SerializerMethodField()
 
     class Meta:
         model  = ProviderDocument
         fields = [
-            'id', 'doc_type', 'file', 'status',
+            'id', 'doc_type', 'file', 'file_url', 'status',
             'reject_reason', 'service_name',
             'uploaded_at', 'verified_at',
         ]
+
+    def get_file_url(self, obj):
+        from profiles.serializers import _resolve_file_url
+        return _resolve_file_url(obj.file, self.context.get('request'))
 
 
 # ── Service serializer ────────────────────────────────────────────
@@ -156,3 +161,53 @@ class PlatformStatsSerializer(serializers.Serializer):
     providers = serializers.DictField()
     documents = serializers.DictField()
     services  = serializers.DictField()
+
+
+# ── Admin CMS & Category Serializers ──────────────────────────────────
+from services.models import ServiceCategory
+from marketing.models import CMSSection, PromoBanner, HowItWorksStep
+
+class AdminCategorySerializer(serializers.ModelSerializer):
+    group_label = serializers.CharField(source='get_group_display', read_only=True)
+    image = serializers.ImageField(required=False, allow_null=True)
+
+    class Meta:
+        model = ServiceCategory
+        fields = [
+            'id', 'name', 'group', 'group_label', 'icon', 'description', 'skill_tags',
+            'slug', 'short_description', 'image', 'image_url', 'display_order', 'is_featured',
+            'is_active', 'created_at', 'seo_title', 'seo_description', 'seo_keywords'
+        ]
+        read_only_fields = ['id', 'slug', 'created_at']
+
+
+class AdminCMSSectionSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField(required=False, allow_null=True)
+
+    class Meta:
+        model = CMSSection
+        fields = [
+            'id', 'section_key', 'title', 'subtitle', 'body', 'cta_text', 'cta_link',
+            'image', 'image_url', 'is_active', 'updated_at'
+        ]
+        read_only_fields = ['id', 'updated_at']
+
+
+class AdminPromoBannerSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField(required=False, allow_null=True)
+
+    class Meta:
+        model = PromoBanner
+        fields = [
+            'id', 'title', 'subtitle', 'coupon_code', 'discount_percent', 'discount_amount',
+            'cta_text', 'cta_link', 'background_color', 'image', 'is_active', 'start_date',
+            'end_date', 'display_order', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class AdminHowItWorksStepSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HowItWorksStep
+        fields = ['id', 'step_number', 'title', 'description', 'icon', 'is_active']
+        read_only_fields = ['id']

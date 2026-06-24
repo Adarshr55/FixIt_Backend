@@ -4,9 +4,23 @@ from services.models import ServiceCategory, ProviderService
 
 class CategoryCardSerializer(serializers.ModelSerializer):
     """Home screen category grid cards."""
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model  = ServiceCategory
-        fields = ['id', 'name', 'group', 'icon', 'description']
+        fields = [
+            'id', 'name', 'group', 'icon', 'description', 
+            'image', 'image_url', 'display_order', 'is_featured', 
+            'short_description'
+        ]
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        if obj.image:
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.image_url or None
 
 
 class ProviderCardSerializer(serializers.ModelSerializer):
@@ -15,7 +29,7 @@ class ProviderCardSerializer(serializers.ModelSerializer):
     distance_km injected via context distance_map.
     """
     provider_name    = serializers.CharField(source='provider.full_name',    read_only=True)
-    provider_photo   = serializers.URLField(source='provider.profile_photo', read_only=True)
+    provider_photo = serializers.SerializerMethodField()
     provider_city    = serializers.CharField(source='provider.city',         read_only=True)
     experience_years = serializers.IntegerField(source='provider.experience_years', read_only=True)
     overall_rating   = serializers.DecimalField(
@@ -27,6 +41,12 @@ class ProviderCardSerializer(serializers.ModelSerializer):
     category_icon    = serializers.CharField(source='category.icon', read_only=True)
     is_verified      = serializers.BooleanField(read_only=True)
     distance_km      = serializers.SerializerMethodField()
+
+    def get_provider_photo(self, obj):
+        request = self.context.get('request')
+        if obj.provider.profile_photo and request:
+            return request.build_absolute_uri(obj.provider.profile_photo.url)
+        return None
 
     class Meta:
         model  = ProviderService
@@ -60,7 +80,7 @@ class ProviderDetailSerializer(serializers.ModelSerializer):
     Includes availability schedule so customer can schedule a booking.
     """
     provider_name    = serializers.CharField(source='provider.full_name',    read_only=True)
-    provider_photo   = serializers.URLField(source='provider.profile_photo', read_only=True)
+    provider_photo = serializers.SerializerMethodField()
     provider_bio     = serializers.CharField(source='provider.bio',          read_only=True)
     provider_city    = serializers.CharField(source='provider.city',         read_only=True)
     experience_years = serializers.IntegerField(source='provider.experience_years', read_only=True)
@@ -74,6 +94,12 @@ class ProviderDetailSerializer(serializers.ModelSerializer):
     category_icon    = serializers.CharField(source='category.icon', read_only=True)
     is_verified      = serializers.BooleanField(read_only=True)
     availability     = serializers.SerializerMethodField()
+
+    def get_provider_photo(self, obj):
+        request = self.context.get('request')
+        if obj.provider.profile_photo and request:
+            return request.build_absolute_uri(obj.provider.profile_photo.url)
+        return None 
 
     class Meta:
         model  = ProviderService
