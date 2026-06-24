@@ -14,5 +14,3 @@ env/
 doker/
 docker-compose.yml
 
-echo "fixit_backend/celerybeat-schedule" >> .gitignore
-echo "fixit_backend/celerybeat.pid" >> .gitignore
