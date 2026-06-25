@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
+from celery.schedules import crontab
 
 load_dotenv()
 
@@ -59,7 +60,8 @@ INSTALLED_APPS = [
     'reviews',
     'payments',
     'public_api',
-    'marketing'
+    'marketing',
+    'ai_engine'
 ]
 
 MIDDLEWARE = [
@@ -219,3 +221,19 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+
+CELERY_BEAT_SCHEDULE = {
+    'nightly-fraud-scan': {
+        'task':     'ai_engine.tasks.run_nightly_fraud_scan',
+        'schedule': crontab(hour=2, minute=0),
+    },
+    'update-completion-rates': {
+        'task':     'ai_engine.tasks.update_provider_completion_rates',
+        'schedule': crontab(minute=0, hour='*/6'),
+    },
+    'update-ranking-signals': {
+        'task':     'ai_engine.tasks.update_provider_ranking_signals',
+        'schedule': crontab(minute=15, hour='*/6'),
+    },
+}

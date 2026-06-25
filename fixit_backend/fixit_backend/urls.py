@@ -32,7 +32,8 @@ urlpatterns = [
     path('api/reviews/',include('reviews.urls')),
     path('api/payments/',include('payments.urls')),
     path('api/public/',include('public_api.urls')),
-    path('api/marketing/',include('marketing.urls'))
+    path('api/marketing/',include('marketing.urls')),
+    path('api/ai_engine/', include('ai_engine.urls'))
 ]
 
 if settings.DEBUG:
