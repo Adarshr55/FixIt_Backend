@@ -225,3 +225,86 @@ class CustomerRecommendedProvidersView(APIView):
             'count': len(ranked),
             'providers': serializer.data,
         })
+    
+class CustomerSemanticSearchView(APIView):
+    """
+    POST /api/customer/search/
+
+    Semantic search for authenticated customer dashboard.
+    Returns category suggestion + nearby providers.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not request.user.is_customer:
+            return Response(
+                {'error': 'Only customers can access this.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        query = request.data.get('query', '').strip()
+        lat   = request.data.get('lat')
+        lng   = request.data.get('lng')
+
+        if not query:
+            return Response(
+                {'error': 'query is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # fallback to saved address if no coordinates provided
+        if not lat or not lng:
+            try:
+                profile = request.user.customer_profile
+                if profile.saved_addresses:
+                    first = profile.saved_addresses[0]
+                    lat   = first.get('latitude')
+                    lng   = first.get('longitude')
+            except Exception:
+                pass
+
+        if not lat or not lng:
+            # no location — return category suggestions only
+            from ai_engine.search_service import search_categories
+            results = search_categories(query, limit=3, min_confidence=40)
+            return Response({
+                'query':          query,
+                'top_category':   results[0] if results else None,
+                'alternatives':   results[1:] if len(results) > 1 else [],
+                'providers':      [],
+                'location_needed': True,
+            })
+
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'lat and lng must be valid numbers.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from ai_engine.search_service import search_with_providers
+        from customer.serializers import ProviderCardSerializer
+
+        result = search_with_providers(query, lat, lng)
+
+        # serialize providers
+        providers_data = []
+        if result['providers']:
+            serializer = ProviderCardSerializer(
+                result['providers'],
+                many=True,
+                context={
+                    'request':      request,
+                    'distance_map': result.get('distance_map', {}),
+                }
+            )
+            providers_data = serializer.data
+
+        return Response({
+            'query':        query,
+            'top_category': result['top_category'],
+            'alternatives': result['alternatives'],
+            'providers':    providers_data,
+        })

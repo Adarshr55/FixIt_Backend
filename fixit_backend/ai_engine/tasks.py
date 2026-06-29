@@ -353,3 +353,38 @@ def update_provider_ranking_signals(self):
     except Exception as e:
         logger.error(f'update_provider_ranking_signals failed: {e}')
         raise self.retry(exc=e, countdown=60)
+    
+
+
+
+@shared_task(bind=True,max_retries=3)
+def embed_category_async(self,category_id):
+    from ai_engine.embedding_service import embed_category
+    try:
+         result = embed_category(category_id)
+         return {'success': result, 'category_id': category_id}
+    except Exception as e:
+         raise self.retry(exc=e, countdown=30)
+    
+@shared_task(bind=True,max_retries=3)
+def embed_service_async(self,service_id):
+    from ai_engine.embedding_service import embed_service
+    try:
+        result = embed_service(service_id)
+        return {'success': result, 'service_id': service_id}
+    except Exception as e:
+        raise self.retry(exc=e, countdown=30)
+    
+@shared_task(bind=True, max_retries=3)
+def embed_issue_async(self, booking_id):
+    """Async Celery task to embed a booking issue description."""
+    from ai_engine.embedding_service import embed_issue
+    try:
+        result = embed_issue(booking_id)
+        return {'success': result, 'booking_id': booking_id}
+    except Exception as e:
+        raise self.retry(exc=e, countdown=30)
+    
+
+    
+

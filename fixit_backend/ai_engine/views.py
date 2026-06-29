@@ -2,7 +2,7 @@ from django.shortcuts import render
 
 # Create your views here.
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -12,6 +12,8 @@ from services.models import ProviderService
 
 from .fraud_detection import run_full_provider_fraud_check
 from .ranking  import get_provider_score_breakdown
+from .search_service import(search_categories,search_with_providers,find_duplicate_services)
+from rest_framework.throttling import AnonRateThrottle
 
 
 class AdminProviderFraudCheckView(APIView):
@@ -180,3 +182,130 @@ class AdminReviewFraudCheckView(APIView):
 
         result = run_full_review_fraud_check(review)
         return Response(result)
+    
+class AdminDuplicateServicesView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
+    def get(self, request):
+        from django.core.cache import cache
+
+        threshold = float(request.query_params.get('threshold', 90)) / 100
+        CACHE_KEY = f'duplicate_services_{int(threshold * 100)}'
+        cached    = cache.get(CACHE_KEY)
+
+        if cached:
+            return Response(cached)
+
+        groups = find_duplicate_services(similarity_threshold=threshold)
+
+        result = {
+            'count':      len(groups),
+            'threshold':  int(threshold * 100),
+            'groups':     groups,
+        }
+
+        cache.set(CACHE_KEY, result, 3600)
+        return Response(result)
+
+
+class AdminCustomerAbuseListView(APIView):
+    """
+    GET /api/ai_engine/admin/customer-abuse/
+    Lists customers who have cancelled an excessive percentage of bookings.
+    """
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
+    def get(self, request):
+        from accounts.models import User
+        from .fraud_detection import check_customer_booking_abuse
+
+        customers = User.objects.filter(role='customer')
+        results = []
+        for cust in customers:
+            check = check_customer_booking_abuse(cust)
+            if check.get('is_abusive'):
+                results.append({
+                    'customer_id':    cust.id,
+                    'customer_email': cust.email,
+                    'customer_name':  getattr(getattr(cust, 'customer_profile', None), 'full_name', cust.email),
+                    'cancel_rate':    check['rate'],
+                    'cancels':        check['cancels'],
+                    'total':          check['total'],
+                    'is_active':      cust.is_active,
+                })
+        return Response({
+            'count': len(results),
+            'results': results
+        })
+    
+
+
+class SearchRateThrottle(AnonRateThrottle):
+     scope = 'public_search'
+
+class PublicSemanticSearchView(APIView):
+    """
+    POST /api/public/search/
+
+    Semantic search for landing page.
+    No auth required.
+    Converts natural language query to category suggestions.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [SearchRateThrottle] 
+
+    def post(self, request):
+        query = request.data.get('query', '').strip()
+
+        if not query:
+            return Response(
+                {'error': 'query is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(query) < 3:
+            return Response(
+                {'error': 'query must be at least 3 characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from ai_engine.search_service import search_categories
+        from bookings.models import Booking
+        from django.db.models import Q
+
+        results = search_categories(query, limit=3, min_confidence=40)
+
+        if not results:
+            return Response({
+                'query':   query,
+                'results': [],
+                'message': 'No matching services found. Try different keywords.',
+            })
+
+        # add available provider count to each result
+        busy_provider_ids = Booking.objects.filter(
+            Q(status__in=['on_the_way', 'arrived', 'in_progress']) |
+            Q(booking_type='instant', status='accepted')
+        ).values_list('provider_id', flat=True)
+
+        from services.models import ProviderService
+        for result in results:
+            count = ProviderService.objects.filter(
+                category_id               = result['category_id'],
+                verification_status       = 'verified',
+                is_active                 = True,
+                provider__approval_status = 'approved',
+                provider__is_online       = True,
+            ).exclude(
+                provider_id__in=busy_provider_ids
+            ).count()
+            result['providers_available'] = count
+
+        return Response({
+            'query':      query,
+            'top_match':  results[0]['category_name'],
+            'results':    results,
+        })
+
+
+

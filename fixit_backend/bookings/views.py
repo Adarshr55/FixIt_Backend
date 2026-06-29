@@ -98,6 +98,19 @@ class CustomerBookingListCreateView(APIView):
             _push_booking_event(booking,'created')
             # NOTE: auto_cancel Celery task goes here in Phase 3
             # auto_cancel_booking.apply_async(args=[booking.id], countdown=120)
+                # ── AI category mismatch hint ──────────────────────────
+            ai_hint = None
+            try:
+                from ai_engine.search_service import detect_category_mismatch
+                mismatch = detect_category_mismatch(
+                    issue_description    = booking.issue_description,
+                    selected_category_id = booking.category_id,
+                    )
+                if mismatch.get('mismatch'):
+                    ai_hint = mismatch
+            except Exception:
+                pass  # never block booking creation for AI errors
+
             if booking.booking_type=='instant':
                 auto_cancel_booking.apply_async(
                      args     = [booking.id],
@@ -117,11 +130,12 @@ class CustomerBookingListCreateView(APIView):
                 )
 
             return Response({
-                'message': 'Booking request sent. Waiting for provider.',
-                'booking': BookingSerializer(booking, context={'request': request}).data,
-            }, status=status.HTTP_201_CREATED)
+                    'message': 'Booking request sent. Waiting for provider.',
+                    'booking': BookingSerializer(booking, context={'request': request}).data,
+                    'ai_hint': ai_hint,  # ← None if no mismatch, dict if mismatch
+                }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+          
 
 
 # bookings/views.py — add this view
