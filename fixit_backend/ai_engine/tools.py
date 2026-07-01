@@ -198,12 +198,10 @@ def get_my_bookings(request, status_filter: str = None) -> dict:
 
     from bookings.models import Booking
 
-    bookings = Booking.objects.filter(
-        customer=request.user
-    ).select_related('provider', 'category').order_by('-created_at')[:10]
-
+    qs = Booking.objects.filter(customer=request.user).select_related(...)
     if status_filter:
-        bookings = bookings.filter(status=status_filter)
+        qs = qs.filter(status=status_filter)
+    bookings = qs.order_by('-created_at')[:10]
 
     results = [{
         'booking_id':   b.id,
