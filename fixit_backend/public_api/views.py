@@ -18,6 +18,7 @@ from services.models import ServiceCategory, ProviderService
 from reviews.models  import Review
 from bookings.models import Booking
 from profiles.models import ProviderProfile
+from rest_framework.throttling import AnonRateThrottle
 
 from customer.services  import ProviderDiscoveryService
 from .serializers import (
@@ -577,4 +578,119 @@ class PublicProviderDetailView(APIView):
             )
 
         serializer = PublicProviderDetailSerializer(service, context={'request': request})
-        return Response(serializer.data)
+        return Response(serializer.data)
+    
+
+
+
+class PublicAssistView(APIView):
+    """
+    POST /api/public/assist/
+
+    Public RAG assistant — no login needed.
+    Used on landing page chat widget.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
+
+    def post(self, request):
+        query = request.data.get('query', '').strip()
+        lat   = request.data.get('lat')
+        lng   = request.data.get('lng')
+        city  = request.data.get('city', '')
+
+        if not query:
+            return Response(
+                {'error': 'query is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(query) < 5:
+            return Response(
+                {'error': 'query must be at least 5 characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if lat:
+                lat = float(lat)
+            if lng:
+                lng = float(lng)
+        except (TypeError, ValueError):
+            lat = lng = None
+
+        from ai_engine.rag_service import get_rag_response
+        result = get_rag_response(
+            query = query,
+            lat   = lat,
+            lng   = lng,
+            city  = city,
+        )
+
+        # serialize providers for public response
+        providers_data = []
+        if result['providers']:
+            from .serializers import PublicProviderCardSerializer
+            serializer = PublicProviderCardSerializer(
+                result['providers'],
+                many=True,
+                context={
+                    'request':      request,
+                    'distance_map': result['distance_map'],
+                }
+            )
+            providers_data = serializer.data
+
+        return Response({
+            'query':              result['query'],
+            'ai_response':        result['ai_response'],
+            'suggested_category': result['suggested_category'],
+            'alternatives':       result['alternatives'],
+            'providers':          providers_data,
+            'pricing':            result['pricing'],
+        })
+
+
+
+class PublicChatView(APIView):
+    """
+    POST /api/public/chat/
+    Body: { "session_id": "uuid-string", "message": "..." }
+
+    Limited AI assistant for anonymous visitors — search only, no booking.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        message    = request.data.get('message', '').strip()
+        session_id = request.data.get('session_id')
+
+        if not message:
+            return Response(
+                {'error': 'message is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from ai_engine.models import ChatSession
+        from ai_engine.chat_service import process_chat_message
+        import uuid
+
+        if session_id:
+            session, _ = ChatSession.objects.get_or_create(
+                session_id = session_id,
+                defaults   = {'user': None}
+            )
+        else:
+            session = ChatSession.objects.create(session_id=uuid.uuid4())
+
+        ai_response = process_chat_message(
+            session          = session,
+            user_message     = message,
+            request          = None,
+            is_authenticated = False,
+        )
+
+        return Response({
+            'session_id': str(session.session_id),
+            'response':   ai_response,
+        })

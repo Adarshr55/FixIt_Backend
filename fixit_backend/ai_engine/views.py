@@ -306,6 +306,41 @@ class PublicSemanticSearchView(APIView):
             'top_match':  results[0]['category_name'],
             'results':    results,
         })
+    
+
+
+
+class ProviderInsightsView(APIView):
+    """
+    GET /api/ai/provider/insights/
+    Provider asks AI how to improve their performance.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_provider:
+            return Response(
+                {'error': 'Only providers can access this.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            profile = request.user.provider_profile
+        except Exception:
+            return Response(
+                {'error': 'Provider profile not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        from .rag_service import get_provider_insights
+        insights = get_provider_insights(profile)
+
+        return Response({
+            'provider': profile.full_name,
+            'insights': insights,
+        })
+    
+
 
 
 

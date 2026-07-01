@@ -9,4 +9,5 @@ urlpatterns = [
     path('admin/duplicate-services/', views.AdminDuplicateServicesView.as_view(), name='ai-duplicate-services'),
     path('admin/customer-abuse/', views.AdminCustomerAbuseListView.as_view(), name='ai-customer-abuse'),
     path('search/',views.PublicSemanticSearchView.as_view(), name='public-semantic-search'),
+    path('provider/insights/', views.ProviderInsightsView.as_view(), name='ai-provider-insights'),
 ]

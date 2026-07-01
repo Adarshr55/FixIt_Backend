@@ -308,3 +308,146 @@ class CustomerSemanticSearchView(APIView):
             'alternatives': result['alternatives'],
             'providers':    providers_data,
         })
+    
+
+
+# class CustomerAssistView(APIView):
+#     """
+#     POST /api/customer/assist/
+
+#     Authenticated RAG assistant with full location context.
+#     Used on customer dashboard.
+#     """
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         if not request.user.is_customer:
+#             return Response(
+#                 {'error': 'Only customers can access this.'},
+#                 status=status.HTTP_403_FORBIDDEN
+#             )
+
+#         query = request.data.get('query', '').strip()
+#         lat   = request.data.get('lat')
+#         lng   = request.data.get('lng')
+
+#         if not query:
+#             return Response(
+#                 {'error': 'query is required.'},
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         # fallback to saved address
+#         if not lat or not lng:
+#             try:
+#                 profile = request.user.customer_profile
+#                 if profile.saved_addresses:
+#                     first = profile.saved_addresses[0]
+#                     lat   = first.get('latitude')
+#                     lng   = first.get('longitude')
+#             except Exception:
+#                 pass
+
+#         try:
+#             if lat:
+#                 lat = float(lat)
+#             if lng:
+#                 lng = float(lng)
+#         except (TypeError, ValueError):
+#             lat = lng = None
+
+#         # get customer city for context
+#         city = ''
+#         try:
+#             city = request.user.customer_profile.saved_addresses[0].get(
+#                 'city', ''
+#             ) if request.user.customer_profile.saved_addresses else ''
+#         except Exception:
+#             pass
+
+#         from ai_engine.rag_service import get_rag_response
+#         from customer.serializers  import ProviderCardSerializer
+
+#         result = get_rag_response(
+#             query = query,
+#             lat   = lat,
+#             lng   = lng,
+#             city  = city,
+#         )
+
+#         providers_data = []
+#         if result['providers']:
+#             serializer = ProviderCardSerializer(
+#                 result['providers'],
+#                 many=True,
+#                 context={
+#                     'request':      request,
+#                     'distance_map': result['distance_map'],
+#                 }
+#             )
+#             providers_data = serializer.data
+
+#         return Response({
+#             'query':              result['query'],
+#             'ai_response':        result['ai_response'],
+#             'suggested_category': result['suggested_category'],
+#             'alternatives':       result['alternatives'],
+#             'providers':          providers_data,
+#             'pricing':            result['pricing'],
+#         })
+    
+
+
+
+
+class CustomerChatView(APIView):
+    """
+    POST /api/customer/chat/
+    Body: { "session_id": "uuid-string", "message": "..." }
+
+    Full AI booking assistant — can search, book, cancel, check status.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not request.user.is_customer:
+            return Response(
+                {'error': 'Only customers can access this.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        message    = request.data.get('message', '').strip()
+        session_id = request.data.get('session_id')
+
+        if not message:
+            return Response(
+                {'error': 'message is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from ai_engine.models import ChatSession
+        from ai_engine.chat_service import process_chat_message
+        import uuid
+
+        if session_id:
+            session, _ = ChatSession.objects.get_or_create(
+                session_id = session_id,
+                defaults   = {'user': request.user}
+            )
+        else:
+            session = ChatSession.objects.create(
+                session_id = uuid.uuid4(),
+                user       = request.user,
+            )
+
+        ai_response = process_chat_message(
+            session          = session,
+            user_message     = message,
+            request          = request,
+            is_authenticated = True,
+        )
+
+        return Response({
+            'session_id':  str(session.session_id),
+            'response':    ai_response,
+        })

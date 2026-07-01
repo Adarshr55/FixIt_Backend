@@ -7,4 +7,5 @@ urlpatterns = [
     path('providers/recommended/', views.CustomerRecommendedProvidersView.as_view(), name='customer-recommended-providers'),
     path('providers/<int:service_id>/', views.CustomerProviderDetailView.as_view(), name='customer-provider-detail'),
     path('search/', views.CustomerSemanticSearchView.as_view(), name='customer-semantic-search'),
+    path('chat/', views.CustomerChatView.as_view(), name='customer-chat'),
 ]
