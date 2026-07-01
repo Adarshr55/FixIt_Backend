@@ -1,9 +1,51 @@
-env/
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.git
-.vscode
-media
-staticfiles
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+env/
+env_backup/
+venv/
+.venv/
+
+# Environment files
+.env
+.env.docker
+.env.production
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Celery
+celerybeat-schedule
+celerybeat-schedule-shm
+celerybeat-schedule-wal
+celerybeat.pid
+
+# Media and logs
+media/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if frontend is in same repo)
+node_modules/
+npm-debug.log
+
+# Test files
+.pytest_cache/
+htmlcov/
+.coverage
