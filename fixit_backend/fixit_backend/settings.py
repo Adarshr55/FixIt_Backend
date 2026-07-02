@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_celery_beat',  
     'django_celery_results',
+    'storages'
     'accounts',
     'profiles',
     'services',
@@ -245,3 +246,17 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute=15, hour='*/6'),
     },
 }
+
+
+import os
+
+# ── S3 Media Storage (production only) ───────────────────────────
+if not DEBUG:
+    DEFAULT_FILE_STORAGE    = 'storages.backends.s3boto3.S3Boto3Storage'
+    AWS_ACCESS_KEY_ID       = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY   = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_REGION_NAME      = os.getenv('AWS_S3_REGION_NAME', 'ap-south-1')
+    AWS_S3_FILE_OVERWRITE   = False
+    AWS_DEFAULT_ACL         = 'public-read'
+    MEDIA_URL = f'https://{os.getenv("AWS_STORAGE_BUCKET_NAME")}.s3.amazonaws.com/'
