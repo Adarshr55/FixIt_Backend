@@ -400,14 +400,20 @@ class CustomerSemanticSearchView(APIView):
 
 
 
+from rest_framework.throttling import UserRateThrottle
+
+class CustomerChatRateThrottle(UserRateThrottle):
+    rate = '10/min'
+
 class CustomerChatView(APIView):
     """
     POST /api/customer/chat/
-    Body: { "session_id": "uuid-string", "message": "..." }
+    Body: { "session_id": "uuid-string", "message": "...", "latitude": ..., "longitude": ... }
 
     Full AI booking assistant — can search, book, cancel, check status.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [CustomerChatRateThrottle]
 
     def post(self, request):
         if not request.user.is_customer:
@@ -418,6 +424,8 @@ class CustomerChatView(APIView):
 
         message    = request.data.get('message', '').strip()
         session_id = request.data.get('session_id')
+        latitude   = request.data.get('latitude')
+        longitude  = request.data.get('longitude')
 
         if not message:
             return Response(
@@ -445,6 +453,8 @@ class CustomerChatView(APIView):
             user_message     = message,
             request          = request,
             is_authenticated = True,
+            lat              = latitude,
+            lng              = longitude,
         )
 
         return Response({

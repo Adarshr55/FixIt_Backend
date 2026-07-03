@@ -72,6 +72,7 @@ def search_providers(
 
             providers_list = [{
                 'service_id':   item['service'].id,
+                'provider_name':item['service'].provider.full_name,
                 'rating':       float(item['service'].provider.overall_rating or 0),
                 'distance_km':  item['distance_km'],
                 'base_charge':  float(item['service'].base_charge),
@@ -81,6 +82,7 @@ def search_providers(
             services = services.order_by('-provider__overall_rating')[:5]
             providers_list = [{
                 'service_id':   s.id,
+                'provider_name':s.provider.full_name,
                 'rating':       float(s.provider.overall_rating or 0),
                 'distance_km':  None,
                 'base_charge':  float(s.base_charge),

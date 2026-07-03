@@ -44,11 +44,14 @@ def _history_to_contents(history: list):
     Convert stored ChatSession history entries back into
     Gemini `types.Content` objects, preserving function
     calls/results so multi-turn tool context isn't lost.
+    Group contiguous function calls and function responses into single multi-part turns.
     """
     from google.genai import types
 
     contents = []
-    for entry in history:
+    i = 0
+    while i < len(history):
+        entry = history[i]
         role = entry['role']
 
         if 'text' in entry:
@@ -56,26 +59,37 @@ def _history_to_contents(history: list):
                 role  = role,
                 parts = [types.Part(text=entry['text'])],
             ))
+            i += 1
 
         elif 'function_call' in entry:
-            fc = entry['function_call']
-            contents.append(types.Content(
-                role  = 'model',
-                parts = [types.Part(function_call=types.FunctionCall(
+            parts = []
+            while i < len(history) and 'function_call' in history[i]:
+                fc = history[i]['function_call']
+                parts.append(types.Part(function_call=types.FunctionCall(
                     name = fc['name'],
                     args = fc['args'],
-                ))],
+                )))
+                i += 1
+            contents.append(types.Content(
+                role  = 'model',
+                parts = parts,
             ))
 
         elif 'function_response' in entry:
-            fr = entry['function_response']
-            contents.append(types.Content(
-                role  = 'tool',
-                parts = [types.Part(function_response=types.FunctionResponse(
+            parts = []
+            while i < len(history) and 'function_response' in history[i]:
+                fr = history[i]['function_response']
+                parts.append(types.Part(function_response=types.FunctionResponse(
                     name     = fr['name'],
                     response = fr['response'],
-                ))],
+                )))
+                i += 1
+            contents.append(types.Content(
+                role  = 'tool',
+                parts = parts,
             ))
+        else:
+            i += 1
 
     return contents
 
@@ -91,6 +105,8 @@ def process_chat_message(
     user_message: str,
     request = None,
     is_authenticated: bool = False,
+    lat = None,
+    lng = None,
 ) -> str:
     from google import genai
     from google.genai import types
@@ -104,13 +120,17 @@ def process_chat_message(
         new_entries = [{'role': 'user', 'text': user_message}]
 
         # rebuild full Gemini `contents` from ALL prior history + this new user message
-        history = session.get_recent_history(limit=20)
+        history = session.get_recent_history(limit=6)
         contents = _history_to_contents(history) + [
             types.Content(role='user', parts=[types.Part(text=user_message)])
         ]
 
+        system_instruction = SYSTEM_PROMPT
+        if lat is not None and lng is not None:
+            system_instruction += f"\nUser's current coordinates: Latitude {lat}, Longitude {lng}. If they ask for nearby providers, use these coordinates directly instead of calling geocode_location."
+
         config = types.GenerateContentConfig(
-            system_instruction = SYSTEM_PROMPT,
+            system_instruction = system_instruction,
             tools              = [tools],
             temperature        = 0.4,
         )
@@ -120,7 +140,7 @@ def process_chat_message(
 
         for _ in range(max_iterations):
             response = client.models.generate_content(
-                model    = 'gemini-2.0-flash',
+                model    = 'gemini-2.5-flash',
                 contents = contents,
                 config   = config,
             )
@@ -133,6 +153,7 @@ def process_chat_message(
 
             if function_calls:
                 contents.append(candidate.content)
+                tool_parts = []
 
                 for fc in function_calls:
                     fn_name = fc.name
@@ -164,15 +185,17 @@ def process_chat_message(
                     })
                     logger.info(f'Sending function_response to Gemini: name={fn_name}, response={fn_result!r}')
 
-                    contents.append(types.Content(
-                        role  = 'tool',
-                        parts = [types.Part(
-                            function_response=types.FunctionResponse(
-                                name     = fn_name,
-                                response = fn_result,
-                            )
-                        )]
+                    tool_parts.append(types.Part(
+                        function_response=types.FunctionResponse(
+                            name     = fn_name,
+                            response = fn_result,
+                        )
                     ))
+
+                contents.append(types.Content(
+                    role  = 'tool',
+                    parts = tool_parts,
+                ))
                 continue
 
             else:
@@ -191,6 +214,55 @@ def process_chat_message(
 
     except Exception as e:
         logger.error(f'process_chat_message failed: {e}')
-        fallback = "I'm having technical difficulties. Please try browsing our categories directly."
+        err_str = str(e)
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+            fallback = _local_fallback_search(user_message)
+        else:
+            fallback = "I'm having technical difficulties. Please try browsing our categories directly."
         session.add_turn([{'role': 'model', 'text': fallback}])
         return fallback
+
+
+def _local_fallback_search(user_message: str) -> str:
+    """
+    Local search fallback when Gemini API is rate-limited (429).
+    Uses keyword matching to query categories and providers from the database.
+    """
+    from services.models import ServiceCategory, ProviderService
+    import re
+
+    # Extract potential category keyword
+    msg = user_message.lower()
+    categories = ServiceCategory.objects.filter(is_active=True)
+    matched_category = None
+    for cat in categories:
+        pattern = r'\b' + re.escape(cat.name.lower()) + r'\b'
+        if re.search(pattern, msg) or cat.name.lower() in msg:
+            matched_category = cat
+            break
+
+    if not matched_category:
+        return "I'm experiencing high traffic right now and couldn't process your request. Please try browsing our service categories directly on the homepage."
+
+    # Find active providers in this category
+    services = ProviderService.objects.filter(
+        category=matched_category,
+        verification_status='verified',
+        is_active=True,
+        provider__approval_status='approved',
+        provider__is_online=True
+    ).select_related('provider')[:3]
+
+    if not services.exists():
+        return f"I am experiencing high traffic right now. I searched our records for '{matched_category.name}', but there are no online providers available in this category at the moment. Please check back shortly."
+
+    # Format list
+    provider_lines = []
+    for s in services:
+        name = s.provider.full_name
+        rating = s.provider.overall_rating or "0.00"
+        rate = s.base_charge
+        provider_lines.append(f"- **{name}** (Rating: {rating}, Base charge: {rate} INR, Service ID: {s.id})")
+
+    providers_str = "\n".join(provider_lines)
+    return f"I'm experiencing high traffic right now, but I found these verified {matched_category.name}s online locally:\n{providers_str}\n\nYou can book any of them by typing: 'book service id [ID]' or using the homepage."

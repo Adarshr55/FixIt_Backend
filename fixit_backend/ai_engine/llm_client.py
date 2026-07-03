@@ -27,7 +27,7 @@ def generate(prompt: str, max_tokens: int = 500) -> str:
     try:
       client = get_client()
       response = client.models.generate_content(
-            model = 'gemini-2.0-flash',
+            model = 'gemini-2.5-flash',
             contents = prompt,
              config = types.GenerateContentConfig(max_output_tokens=max_tokens),
         )
@@ -43,7 +43,7 @@ def generate_with_system(system: str, user: str, max_tokens: int = 500) -> str:
         client = get_client()
         from google.genai import types
         response = client.models.generate_content(
-            model = 'gemini-2.0-flash',
+            model = 'gemini-2.5-flash',
             contents = user,
              config   = types.GenerateContentConfig(
                 system_instruction = system,

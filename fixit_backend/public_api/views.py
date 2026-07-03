@@ -652,18 +652,26 @@ class PublicAssistView(APIView):
 
 
 
+from rest_framework.throttling import AnonRateThrottle
+
+class PublicChatRateThrottle(AnonRateThrottle):
+    rate = '3/min'
+
 class PublicChatView(APIView):
     """
     POST /api/public/chat/
-    Body: { "session_id": "uuid-string", "message": "..." }
+    Body: { "session_id": "uuid-string", "message": "...", "latitude": ..., "longitude": ... }
 
     Limited AI assistant for anonymous visitors — search only, no booking.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [PublicChatRateThrottle]
 
     def post(self, request):
         message    = request.data.get('message', '').strip()
         session_id = request.data.get('session_id')
+        latitude   = request.data.get('latitude')
+        longitude  = request.data.get('longitude')
 
         if not message:
             return Response(
@@ -688,6 +696,8 @@ class PublicChatView(APIView):
             user_message     = message,
             request          = None,
             is_authenticated = False,
+            lat              = latitude,
+            lng              = longitude,
         )
 
         return Response({
