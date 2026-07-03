@@ -14,3 +14,5 @@ env/
 doker/
 docker-compose.yml
 
+# Celery Beat schedule database
+celerybeat-schedule*
