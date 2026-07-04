@@ -286,7 +286,7 @@ if not DEBUG:
     AWS_ACCESS_KEY_ID       = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY   = os.getenv('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_REGION_NAME      = os.getenv('AWS_S3_REGION_NAME', 'ap-south-1')
+    AWS_S3_REGION_NAME      = os.getenv('AWS_S3_REGION_NAME','ap-southeast-2')
     AWS_S3_FILE_OVERWRITE   = False
     AWS_DEFAULT_ACL         = 'public-read'
-    MEDIA_URL = f'https://{os.getenv("AWS_STORAGE_BUCKET_NAME")}.s3.amazonaws.com/'
+    MEDIA_URL = f'https://{os.getenv("AWS_STORAGE_BUCKET_NAME")}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/'
