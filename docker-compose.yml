@@ -115,22 +115,23 @@ services:
 
 
   # ── Nginx — reverse proxy, routes HTTP → gunicorn, WS → daphne ───────────
-  nginx:
+nginx:
     image: nginx:alpine
     container_name: fixit_nginx
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - static_files:/app/staticfiles:ro
       - media_files:/app/media:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
-
 
 volumes:
   postgres_data:
