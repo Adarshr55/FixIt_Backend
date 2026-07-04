@@ -34,12 +34,13 @@ from .serializers import (
 )
 
 def _set_refresh_cookie(response, refresh_token):
+    from django.conf import settings
     response.set_cookie(
         key='refresh_token',
         value=refresh_token,
         httponly=True,
-        secure=False,  # Set to True in production HTTPS
-        samesite='Lax',
+        secure=settings.JWT_COOKIE_SECURE,
+        samesite=settings.JWT_COOKIE_SAMESITE,
         max_age=7 * 24 * 3600  # 7 days
     )
 

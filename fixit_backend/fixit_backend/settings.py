@@ -163,6 +163,12 @@ CORS_ALLOWED_ORIGINS=[
     'http://localhost:5173',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5173',
+    'https://localhost:5173',
+    'https://127.0.0.1:5173',
+    'https://localhost:5174',
+    'https://127.0.0.1:5174',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
 ]
 
 
@@ -174,6 +180,10 @@ CACHES = {
 }
 
 CORS_ALLOWED_CREDENTIALS=True
+
+# JWT Cookie Settings for cross-site or same-site cookies
+JWT_COOKIE_SECURE = os.getenv('JWT_COOKIE_SECURE', 'False' if DEBUG else 'True') == 'True'
+JWT_COOKIE_SAMESITE = os.getenv('JWT_COOKIE_SAMESITE', 'Lax' if DEBUG else 'None')
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
