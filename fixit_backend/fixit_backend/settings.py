@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_celery_beat',  
     'django_celery_results',
+    'drf_spectacular',
     'storages',
     'accounts',
     'profiles',
@@ -141,7 +142,9 @@ REST_FRAMEWORK={
     'DEFAULT_THROTTLE_RATES': {
         'public_search': '20/minute',
     },
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
 
 
 SIMPLE_JWT = {
@@ -258,6 +261,12 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = os.getenv('EMAIL_HOST_USER')
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'FixIt API',
+    'DESCRIPTION': 'On-demand home & automotive services marketplace API',
+    'VERSION': '1.0.0',
+}
 
 import os
 
