@@ -4,6 +4,8 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from .models import User
 from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
 
 
 
@@ -13,15 +15,70 @@ def get_tokens_for_user(user):
         refresh['email']=user.email
         return {'refresh':str(refresh),'access':str(refresh.access_token)}
 
+
+from django.core.mail import send_mail
+from .models import EmailOTP
+
+def send_otp_to_email(email):
+    # Invalidate previous unused codes
+    EmailOTP.objects.filter(email=email, is_used=False).update(is_used=True)
+    
+    otp = EmailOTP.create_for_email(email)
+    subject = 'Verify your FixIt email'
+    message = (
+        f"Hi,\n\n"
+        f"Your FixIt verification code is: {otp.otp_code}\n\n"
+        f"This code expires in 10 minutes. If you didn't request this, ignore this email.\n\n"
+        f"— FixIt Team"
+    )
+    send_mail(
+        subject,
+        message,
+        None,  # uses DEFAULT_FROM_EMAIL
+        [email],
+        fail_silently=False,
+    )
+    return otp
+
+
+def send_password_reset_email(email):
+    # Invalidate previous unused codes
+    EmailOTP.objects.filter(email=email, is_used=False).update(is_used=True)
+    
+    otp = EmailOTP.create_for_email(email)
+    subject = 'Reset your FixIt password'
+    message = (
+        f"Hi,\n\n"
+        f"Your FixIt password reset verification code is: {otp.otp_code}\n\n"
+        f"This code expires in 10 minutes. If you didn't request a password reset, you can safely ignore this email.\n\n"
+        f"— FixIt Team"
+    )
+    send_mail(
+        subject,
+        message,
+        None,  # uses DEFAULT_FROM_EMAIL
+        [email],
+        fail_silently=False,
+    )
+    return otp
+
 class BaseRegisterSerializer(serializers.Serializer): 
     email=serializers.EmailField()
     password=serializers.CharField(write_only=True, validators=[validate_password])
     password2=serializers.CharField(write_only=True)
     ROLE=None
     def validate_email(self, value):
-        value=value.lower().strip()
+        value = value.lower().strip()
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError( "An account with this email already exists.")
+            raise serializers.ValidationError("An account with this email already exists.")
+        
+        # Gate: check for recently verified OTP
+        time_limit = timezone.now() - timedelta(minutes=15)
+        has_verified = EmailOTP.objects.filter(
+            email=value, is_verified=True, verified_at__gte=time_limit
+        ).exists()
+        if not has_verified:
+            raise serializers.ValidationError("Email has not been verified yet. Please verify your email first.")
         return value
     
     def validate(self, attrs):
@@ -35,11 +92,14 @@ class BaseRegisterSerializer(serializers.Serializer):
         if self.ROLE is None:
             raise NotImplementedError("Subclasses must define a ROLE attribute.")
         validated_data.pop('password2')
-        return User.objects.create_user(
+        user = User.objects.create_user(
             email=validated_data['email'],
             password=validated_data['password'],
             role=self.ROLE
         )
+        user.is_email_verified = True  # Verified via pre-registration OTP
+        user.save()
+        return user
     
 class CustomerRegisterSerializer(BaseRegisterSerializer):
     ROLE='customer'
@@ -83,8 +143,10 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "is_active",
             "is_staff",
             "is_superuser",
-            # "is_phone_verified",
+            "is_phone_verified",
             "is_profile_complete",
+            "is_google_auth",
+            "is_email_verified",
             "date_joined",
         ]
 
@@ -124,3 +186,61 @@ class AdminRegisterSerializer(BaseRegisterSerializer):
             password=validated_data["password"],
 
         )
+    
+class GoogleAuthSerializer(serializers.Serializer):
+    id_token = serializers.CharField()
+    role = serializers.ChoiceField(choices=['customer', 'provider'], required=False)
+
+
+
+class SendOTPRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    
+    def validate_email(self, value):
+        value = value.lower().strip()
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return value
+
+
+class VerifyOTPRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp_code = serializers.CharField(max_length=6, min_length=6)
+    
+    def validate_otp_code(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("OTP must be numeric.")
+        return value
+
+
+class ForgotPasswordRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        value = value.lower().strip()
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("No account found with this email address.")
+        return value
+
+
+class ForgotPasswordVerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp_code = serializers.CharField(max_length=6, min_length=6)
+
+    def validate_otp_code(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("OTP must be numeric.")
+        return value
+
+
+class ForgotPasswordResetSerializer(serializers.Serializer):
+    reset_token = serializers.UUIDField()
+    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+    new_password2 = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['new_password2']:
+            raise serializers.ValidationError(
+                {"new_password2": "Passwords do not match."}
+            )
+        return attrs
